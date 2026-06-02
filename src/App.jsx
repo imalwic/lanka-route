@@ -1333,7 +1333,12 @@ out body 40;`;
         allImages = [mainThumbnail, ...allImages];
       }
 
-      const stats = parseHistoricalStats(extractText);
+      let stats = { builder: null, era: null, currentStatus: 'General Location' };
+      try {
+        stats = parseHistoricalStats(extractText) || stats;
+      } catch (e) {
+        console.error('Error parsing stats:', e);
+      }
 
       // Attempt to load Sinhala page content from si.wikipedia.org if Sinhala link exists
       let sinhalaContent = null;
@@ -1359,18 +1364,33 @@ out body 40;`;
         }
       }
 
-      // Enrich Sinhala sections with rich historical content
-      const enrichedSinhalaSections = getEnrichedSinhalaSections(sinhalaTitle || title, parsedSinhalaSections);
+      let enrichedSinhalaSections = [];
+      try {
+        enrichedSinhalaSections = getEnrichedSinhalaSections(sinhalaTitle || title, parsedSinhalaSections);
+      } catch (e) {
+        console.error('Error enriching Sinhala sections:', e);
+      }
 
-      // Generate dynamic status descriptions
-      const enStatusDesc = generateStatusDescription(stats.currentStatus, 'en');
-      const finalSiStats = sinhalaStats || translateStatsToSinhala(stats);
-      const siStatusDesc = generateStatusDescription(finalSiStats.currentStatus, 'si');
+      let enStatusDesc = '';
+      let finalSiStats = stats;
+      let siStatusDesc = '';
+      
+      try {
+        enStatusDesc = generateStatusDescription(stats.currentStatus, 'en');
+        finalSiStats = sinhalaStats || translateStatsToSinhala(stats);
+        siStatusDesc = generateStatusDescription(finalSiStats.currentStatus, 'si');
+      } catch (e) {
+        console.error('Error translating stats:', e);
+      }
 
       // Append dynamic status sections
-      const finalEnSections = [...parsedSections, { title: 'Current Status', content: enStatusDesc }];
+      const finalEnSections = [...parsedSections];
+      if (enStatusDesc) {
+        finalEnSections.push({ title: 'Current Status', content: enStatusDesc });
+      }
+      
       const finalSiSections = [...enrichedSinhalaSections];
-      if (!finalSiSections.some(s => s.title.includes('තත්ත්වය'))) {
+      if (siStatusDesc && !finalSiSections.some(s => s.title.includes('තත්ත්වය'))) {
         finalSiSections.push({ title: 'වර්තමාන තත්ත්වය (Current Status)', content: siStatusDesc });
       }
 
