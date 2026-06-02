@@ -170,7 +170,7 @@ const parseWikiSections = (text) => {
 // Helper to fetch photo URLs from MediaWiki API
 const fetchWikiImages = async (title) => {
   try {
-    const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&generator=images&gimlimit=25&prop=imageinfo&iiprop=url&format=json&origin=*`;
+    const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&generator=images&gimlimit=25&prop=imageinfo&iiprop=url&format=json&origin=*&redirects=1`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
@@ -1304,7 +1304,7 @@ out body 40;`;
     setWikiLanguage('en'); // Reset default language to English when loading a new article
     try {
       // Query English article with langlinks for 'si'
-      const detailsUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts|coordinates|pageimages|langlinks&lllang=si&explaintext=1&pithumbsize=800&format=json&origin=*`;
+      const detailsUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts|coordinates|pageimages|langlinks&lllang=si&explaintext=1&pithumbsize=800&format=json&origin=*&redirects=1`;
       const detailsRes = await fetch(detailsUrl);
       if (!detailsRes.ok) throw new Error('Failed to load article details');
       
@@ -1342,7 +1342,7 @@ out body 40;`;
 
       if (sinhalaTitle) {
         try {
-          const siUrl = `https://si.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(sinhalaTitle)}&prop=extracts&explaintext=1&format=json&origin=*`;
+          const siUrl = `https://si.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(sinhalaTitle)}&prop=extracts&explaintext=1&format=json&origin=*&redirects=1`;
           const siRes = await fetch(siUrl);
           if (siRes.ok) {
             const siData = await siRes.json();
