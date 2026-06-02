@@ -28,6 +28,7 @@ import {
   optimizeRouteWithLocks, 
   getOSRMRouteGeometry 
 } from './utils/optimizer';
+import { getEnrichedSinhalaSections } from './utils/wikiEnrichment';
 
 // Travel vehicle modes profiles for speed scaling and expressway constraints in Sri Lanka
 const VEHICLE_PROFILES = {
@@ -180,12 +181,14 @@ const fetchWikiImages = async (title) => {
       if (info?.url) {
         const fileUrl = info.url;
         const lower = fileUrl.toLowerCase();
-        if ((lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png')) &&
-            !lower.includes('commons/thumb/b/b4/amanda_icon') &&
-            !lower.includes('disambig') &&
-            !lower.includes('padlock') &&
-            !lower.includes('edit-clear') &&
-            !lower.includes('question_book')) {
+        const isPhoto = lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png');
+        const isNotIcon = !lower.includes('icon') && !lower.includes('disambig') && !lower.includes('padlock') && 
+                          !lower.includes('edit-clear') && !lower.includes('question_book') &&
+                          !lower.includes('map') && !lower.includes('logo') && !lower.includes('flag') &&
+                          !lower.includes('signature') && !lower.includes('coa') && !lower.includes('symbol') &&
+                          !lower.includes('plan') && !lower.includes('locator') && !lower.includes('stub');
+        
+        if (isPhoto && isNotIcon) {
           urls.push(fileUrl);
         }
       }
@@ -199,14 +202,24 @@ const fetchWikiImages = async (title) => {
 
 // Helper to parse builder and era from overview text
 const parseHistoricalStats = (text) => {
-  if (!text) return { builder: 'Ancient Sinhalese Rulers', era: 'Ancient Era' };
+  if (!text) return { builder: null, era: null, currentStatus: 'General Location' };
+  
+  const lowerText = text.toLowerCase();
+  let currentStatus = 'General Location';
+  if (lowerText.includes('ruin') || lowerText.includes('destroyed')) currentStatus = 'Ruins';
+  else if (lowerText.includes('unesco') || lowerText.includes('world heritage')) currentStatus = 'UNESCO Heritage Site';
+  else if (lowerText.includes('active') || lowerText.includes('worship') || lowerText.includes('pilgrimage') || lowerText.includes('sacred') || lowerText.includes('relic') || lowerText.includes('temple')) currentStatus = 'Active Religious Site';
+  else if (lowerText.includes('park') || lowerText.includes('reserve') || lowerText.includes('sanctuary') || lowerText.includes('forest')) currentStatus = 'Nature Reserve';
+  else if (lowerText.includes('beach') || lowerText.includes('bay') || lowerText.includes('coast') || lowerText.includes('sea')) currentStatus = 'Coastal Area';
+  else if (lowerText.includes('lake') || lowerText.includes('reservoir') || lowerText.includes('tank') || lowerText.includes('wewa')) currentStatus = 'Water Body';
+  else if (lowerText.includes('mountain') || lowerText.includes('peak') || lowerText.includes('range') || lowerText.includes('hill')) currentStatus = 'Mountain/Peak';
   
   const kingRegexes = [
     /(?:built|constructed|founded|erected|established)\s+(?:by|during the reign of)\s+(?:King\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/i,
     /(?:King|ruler)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/
   ];
   
-  let builder = 'Ancient Sinhalese Rulers';
+  let builder = null;
   for (const regex of kingRegexes) {
     const match = text.match(regex);
     if (match && match[1]) {
@@ -223,7 +236,7 @@ const parseHistoricalStats = (text) => {
     /(?:in|around|circa|built in)\s+(\d{3,4}\s*(?:BC|AD)?)/i
   ];
 
-  let era = 'Ancient Era';
+  let era = null;
   for (const regex of eraRegexes) {
     const match = text.match(regex);
     if (match && match[1]) {
@@ -232,19 +245,40 @@ const parseHistoricalStats = (text) => {
     }
   }
 
-  return { builder, era };
+  return { builder, era, currentStatus };
 };
 
 // Helper to translate parsed English stats to beautiful Sinhala phrases
 const translateStatsToSinhala = (stats) => {
   const dict = {
+    'Mahasena of Anuradhapura': 'මහාසේන රජතුමා',
+    'King Mahasena': 'මහාසේන රජතුමා',
+    'Mahasena': 'මහාසේන රජතුමා',
+    'Vattagamani Abhaya': 'වළගම්බා රජතුමා',
+    'Vattagamani': 'වළගම්බා රජතුමා',
+    'King Dhatusena': 'ධාතුසේන රජතුමා',
+    'Dhatusena': 'ධාතුසේන රජතුමා',
     'King Devanampiya Tissa': 'දේවානම්පිය තිස්ස රජතුමා',
+    'Devanampiya Tissa': 'දේවානම්පිය තිස්ස රජතුමා',
     'King Dutugemunu': 'දුටුගැමුණු රජතුමා',
+    'Dutugemunu': 'දුටුගැමුණු රජතුමා',
     'King Kashyapa': 'කාශ්‍යප රජතුමා',
+    'Kashyapa': 'කාශ්‍යප රජතුමා',
     'King Parakramabahu I': 'පළමු පරාක්‍රමබාහු රජතුමා',
+    'Parakramabahu I': 'පළමු පරාක්‍රමබාහු රජතුමා',
+    'Parakramabahu': 'පරාක්‍රමබාහු රජතුමා',
     'King Walagamba': 'වළගම්බා රජතුමා',
+    'Walagamba': 'වළගම්බා රජතුමා',
+    'King Saddhatissa': 'සද්ධාතිස්ස රජතුමා',
+    'Saddhatissa': 'සද්ධාතිස්ස රජතුමා',
+    'King Nissanka Malla': 'නිශ්ශංක මල්ල රජතුමා',
+    'Nissanka Malla': 'නිශ්ශංක මල්ල රජතුමා',
     'Ancient Sinhalese Rulers': 'පුරාණ සිංහල රජවරු',
     'Ancient Era': 'පුරාණ යුගය',
+    'Historical Monument': 'ඓතිහාසික ස්මාරකය',
+    'Ruins': 'නටඹුන් තත්ත්වය',
+    'UNESCO Heritage Site': 'යුනෙස්කෝ ලෝක උරුමයකි',
+    'Active Religious Site': 'සක්‍රීය පූජනීය ස්ථානයකි',
     'century': 'සියවස',
     '1st century BC': 'පූර්ව ක්‍රිස්තු වර්ෂ 1 වන සියවස',
     '2nd century BC': 'පූර්ව ක්‍රිස්තු වර්ෂ 2 වන සියවස',
@@ -265,6 +299,7 @@ const translateStatsToSinhala = (stats) => {
 
   let builder = stats.builder;
   let era = stats.era;
+  let currentStatus = stats.currentStatus || 'Historical Monument';
 
   Object.entries(dict).forEach(([key, val]) => {
     if (builder.toLowerCase().includes(key.toLowerCase())) {
@@ -273,22 +308,81 @@ const translateStatsToSinhala = (stats) => {
     if (era.toLowerCase().includes(key.toLowerCase())) {
       era = val;
     }
+    if (currentStatus.toLowerCase() === key.toLowerCase()) {
+      currentStatus = val;
+    }
   });
 
-  if (era === stats.era) {
-    era = era
-      .replace(/(\d+)(?:st|nd|rd|th)\s+century\s+BC/i, 'ක්‍රි.පූ. $1 වන සියවස')
-      .replace(/(\d+)(?:st|nd|rd|th)\s+century\s+AD/i, 'ක්‍රි.ව. $1 වන සියවස')
-      .replace(/(\d+)(?:st|nd|rd|th)\s+century/i, '$1 වන සියවස');
+  if (era && era === stats.era) {
+    if (/^\d{3,4}$/.test(era.trim())) {
+      era = `${era.trim()} වර්ෂයේ`;
+    } else {
+      era = era
+        .replace(/(\d+)(?:st|nd|rd|th)\s+century\s+BC/i, 'ක්‍රි.පූ. $1 වන සියවස')
+        .replace(/(\d+)(?:st|nd|rd|th)\s+century\s+AD/i, 'ක්‍රි.ව. $1 වන සියවස')
+        .replace(/(\d+)(?:st|nd|rd|th)\s+century/i, '$1 වන සියවස');
+    }
   }
 
-  if (builder === stats.builder) {
+  if (builder && builder === stats.builder) {
     if (builder.toLowerCase().startsWith('king ')) {
       builder = builder.substring(5) + ' රජතුමා';
     }
   }
 
-  return { builder, era };
+  // Final fallback to ensure NO English letters remain if Sinhala is selected
+  if (builder && /[a-zA-Z]/.test(builder)) {
+    builder = 'පුරාණ ශ්‍රී ලාංකීය රජවරු';
+  }
+  if (era && /[a-zA-Z]/.test(era)) {
+    era = 'පුරාණ යුගය';
+  }
+  if (currentStatus && /[a-zA-Z]/.test(currentStatus)) {
+    currentStatus = 'මනරම් ස්ථානයකි';
+  }
+
+  return { builder, era, currentStatus };
+};
+
+// Helper to generate a detailed paragraph for the current status
+const generateStatusDescription = (status, lang) => {
+  if (lang === 'si') {
+    if (status.includes('යුනෙස්කෝ') || status === 'UNESCO Heritage Site') {
+      return 'මෙම ස්ථානය වර්තමානයේ යුනෙස්කෝ ලෝක උරුමයක් ලෙස නම් කර ඇති අතර, ගෝලීය වශයෙන් ඉහළ පුරාවිද්‍යාත්මක වටිනාකමක් සහිත දැඩි ලෙස සංරක්ෂිත කලාපයක් ලෙස පවත්වාගෙන යනු ලබයි.';
+    } else if (status.includes('නටඹුන්') || status === 'Ruins') {
+      return 'මෙම ඓතිහාසික ස්ථානය වර්තමානය වන විට නටඹුන් තත්ත්වයේ පවතින අතර, පුරාවිද්‍යා දෙපාර්තමේන්තුව විසින් මතු පරපුර උදෙසා සංරක්ෂණය කර ඇත.';
+    } else if (status.includes('සක්‍රීය') || status === 'Active Religious Site') {
+      return 'මෙම ස්ථානය වර්තමානය වන විටද සක්‍රීය පූජනීය ස්ථානයක් ලෙස පවතින අතර, දිනපතා විශාල බැතිමතුන් පිරිසක් මෙහි වන්දනාමාන කිරීම සඳහා පැමිණෙති.';
+    } else if (status === 'Nature Reserve') {
+      return 'මෙම ප්‍රදේශය ස්වභාවික සංරක්ෂිත කලාපයක් හෝ වනජීවී අභයභූමියක් ලෙස පවත්වාගෙන යනු ලබන අතර, ඉතා සුන්දර ස්වභාවික පරිසරයකින් යුක්ත වේ.';
+    } else if (status === 'Coastal Area') {
+      return 'මෙය දෙස් විදෙස් සංචාරකයින්ගේ අතිශය ආකර්ෂණය දිනාගත්, මනරම් වෙරළ තීරයකින් සමන්විත ප්‍රදේශයකි.';
+    } else if (status === 'Water Body') {
+      return 'මෙම ස්ථානය ප්‍රදේශයේ කෘෂිකාර්මික හා පාරිසරික අවශ්‍යතා සඳහා අතිශය වැදගත් වන ප්‍රධාන ජලාශයක් හෝ ජල මූලාශ්‍රයක් වේ.';
+    } else if (status === 'Mountain/Peak') {
+      return 'මෙම ප්‍රදේශය කඳුකර භූ විශමතාවයකින් යුත්, ස්වභාව සෞන්දර්යයෙන් අනූන අලංකාර ස්ථානයකි.';
+    } else {
+      return 'මෙම ප්‍රදේශය ශ්‍රී ලංකාවේ වැදගත් ස්ථානයක් ලෙස හඳුනාගෙන ඇති අතර නිරන්තරයෙන් සංචාරකයින්ගේ අවධානයට ලක්වී ඇත.';
+    }
+  } else {
+    if (status.includes('UNESCO') || status === 'UNESCO Heritage Site') {
+      return 'This location is currently designated as a UNESCO World Heritage site and is maintained as a highly protected archaeological zone with immense global historical value.';
+    } else if (status.includes('Ruin') || status === 'Ruins') {
+      return 'This historical site currently exists in a state of ruins and is actively preserved by the archaeological department for future generations.';
+    } else if (status.includes('Active') || status === 'Active Religious Site') {
+      return 'This location continues to function as an active religious and sacred site today, attracting a large number of devotees and pilgrims daily.';
+    } else if (status === 'Nature Reserve') {
+      return 'This area serves as a protected nature reserve or wildlife sanctuary, offering pristine natural environments.';
+    } else if (status === 'Coastal Area') {
+      return 'This is a beautiful coastal area featuring pristine beaches that attract visitors from around the world.';
+    } else if (status === 'Water Body') {
+      return 'This location is a significant water body or reservoir, vital for the local environment and agriculture.';
+    } else if (status === 'Mountain/Peak') {
+      return 'This area is characterized by majestic mountainous terrain and peaks, offering breathtaking scenic beauty.';
+    } else {
+      return 'This site currently stands as an important landmark in Sri Lanka and remains a major attraction for visitors.';
+    }
+  }
 };
 
 // Helper to generate unique IDs
@@ -1142,18 +1236,48 @@ out body 40;`;
 
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(val + ' Sri Lanka')}&format=json&origin=*`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          const list = data.query?.search || [];
-          setWikiSuggestions(list.map(item => ({
+        const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(val + ' Sri Lanka')}&format=json&origin=*`;
+        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&countrycodes=lk&limit=5`;
+        
+        const [wikiRes, nomRes] = await Promise.all([
+          fetch(wikiUrl).catch(() => ({ ok: false })),
+          fetch(nomUrl).catch(() => ({ ok: false }))
+        ]);
+        
+        let combined = [];
+
+        if (wikiRes.ok) {
+          const wikiData = await wikiRes.json();
+          const list = wikiData.query?.search || [];
+          combined = list.map(item => ({
             title: item.title,
-            snippet: item.snippet.replace(/<\/?[^>]+(>|$)/g, "") // Strip HTML tags
-          })));
+            snippet: item.snippet.replace(/<\/?[^>]+(>|$)/g, ""),
+            source: 'wikipedia'
+          }));
         }
+        
+        if (nomRes.ok) {
+          const nomData = await nomRes.json();
+          const nomList = nomData.map(item => ({
+            title: item.name || item.display_name.split(',')[0],
+            snippet: item.display_name,
+            source: 'nominatim',
+            lat: parseFloat(item.lat),
+            lon: parseFloat(item.lon)
+          }));
+          
+          const existingTitles = new Set(combined.map(c => c.title.toLowerCase()));
+          nomList.forEach(n => {
+            if (!existingTitles.has(n.title.toLowerCase())) {
+              combined.push(n);
+              existingTitles.add(n.title.toLowerCase());
+            }
+          });
+        }
+        
+        setWikiSuggestions(combined);
       } catch (err) {
-        console.error('Wikipedia search error:', err);
+        console.error('Search error:', err);
       } finally {
         setWikiLoading(false);
       }
@@ -1161,7 +1285,11 @@ out body 40;`;
   };
 
   // Fetch full Wikipedia article details (both English and native Sinhala if available)
-  const loadWikiArticle = async (title) => {
+  const loadWikiArticle = async (suggestion) => {
+    const title = typeof suggestion === 'string' ? suggestion : suggestion.title;
+    const isNominatim = typeof suggestion === 'object' && suggestion.source === 'nominatim';
+    const nomCoords = isNominatim ? { lat: suggestion.lat, lon: suggestion.lon } : null;
+
     setWikiLoading(true);
     setActiveWikiImageIndex(0);
     setWikiLanguage('en'); // Reset default language to English when loading a new article
@@ -1174,11 +1302,13 @@ out body 40;`;
       const detailsData = await detailsRes.json();
       const pages = detailsData.query?.pages || {};
       const pageId = Object.keys(pages)[0];
-      if (pageId === '-1') throw new Error('Article not found');
+      if (pageId === '-1') {
+        throw new Error('Article not found');
+      }
       
       const page = pages[pageId];
       const extractText = page.extract || '';
-      const coordinates = page.coordinates?.[0] || null;
+      const coordinates = page.coordinates?.[0] || nomCoords;
       const mainThumbnail = page.thumbnail?.source || null;
 
       // Extract Sinhala title if it exists in langlinks
@@ -1220,28 +1350,67 @@ out body 40;`;
         }
       }
 
+      // Enrich Sinhala sections with rich historical content
+      const enrichedSinhalaSections = getEnrichedSinhalaSections(sinhalaTitle || title, parsedSinhalaSections);
+
+      // Generate dynamic status descriptions
+      const enStatusDesc = generateStatusDescription(stats.currentStatus, 'en');
+      const finalSiStats = sinhalaStats || translateStatsToSinhala(stats);
+      const siStatusDesc = generateStatusDescription(finalSiStats.currentStatus, 'si');
+
+      // Append dynamic status sections
+      const finalEnSections = [...parsedSections, { title: 'Current Status', content: enStatusDesc }];
+      const finalSiSections = [...enrichedSinhalaSections];
+      if (!finalSiSections.some(s => s.title.includes('තත්ත්වය'))) {
+        finalSiSections.push({ title: 'වර්තමාන තත්ත්වය (Current Status)', content: siStatusDesc });
+      }
+
       setWikiArticle({
         title: page.title,
         mainImage: mainThumbnail,
-        images: allImages.slice(0, 12),
+        images: allImages.slice(0, 6),
         coordinates: coordinates,
         en: {
           title: page.title,
-          sections: parsedSections,
+          sections: finalEnSections,
           stats: stats
         },
-        si: sinhalaContent ? {
-          title: sinhalaTitle,
-          sections: parsedSinhalaSections,
-          stats: sinhalaStats || translateStatsToSinhala(stats)
-        } : null
+        si: {
+          title: sinhalaTitle || title,
+          sections: finalSiSections,
+          stats: finalSiStats
+        }
       });
 
       setWikiSearchQuery('');
       setWikiSuggestions([]);
     } catch (err) {
       console.error('Error loading wiki article:', err);
-      alert('Could not retrieve historical details for this location. Please try another place.');
+      // Fallback: Universal 'No Information' state instead of annoying alerts
+      setWikiArticle({
+        title: title,
+        mainImage: null,
+        images: [],
+        coordinates: nomCoords,
+        en: {
+          title: title,
+          sections: [{
+            title: 'Information',
+            content: 'Sufficient information has not been received from our sources for this specific location. However, you can still view it on the map and add it to your trip itinerary.'
+          }],
+          stats: { builder: null, era: null, currentStatus: 'General Location' }
+        },
+        si: {
+          title: title,
+          sections: [{
+            title: 'තොරතුරු (Information)',
+            content: 'මෙම ස්ථානය පිළිබඳව ප්‍රමාණවත් තොරතුරු අපගේ මූලාශ්‍ර වෙතින් ලැබී නොමැත. කෙසේ වෙතත්, ඔබට මෙය සිතියම මත බලා ඔබගේ ගමනට එක්කර ගත හැක.'
+          }],
+          stats: { builder: null, era: null, currentStatus: 'General Location' }
+        }
+      });
+      setWikiSuggestions([]);
+      setWikiSearchQuery('');
     } finally {
       setWikiLoading(false);
     }
@@ -1959,7 +2128,7 @@ out body 40;`;
                   <input 
                     type="text"
                     className="search-input"
-                    placeholder="Search historical place names..."
+                    placeholder="Search any place in Sri Lanka..."
                     value={wikiSearchQuery}
                     onChange={handleWikiSearchChange}
                   />
@@ -1972,7 +2141,7 @@ out body 40;`;
                       <li 
                         key={idx} 
                         className="suggestion-item"
-                        onClick={() => loadWikiArticle(item.title)}
+                        onClick={() => loadWikiArticle(item)}
                       >
                         <strong style={{ color: '#06b6d4' }}>{item.title}</strong>
                         <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
@@ -1984,7 +2153,7 @@ out body 40;`;
                 )}
                 {wikiLoading && !wikiArticle && (
                   <div className="suggestions-list" style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                    Searching historical records...
+                    Searching Sri Lanka map...
                   </div>
                 )}
               </div>
@@ -2234,22 +2403,26 @@ out body 40;`;
 
             {/* Quick Stats Panel */}
             <div className="wiki-stats-grid">
-              <div className="wiki-stat-card">
-                <span className="wiki-stat-label">
-                  {wikiLanguage === 'si' ? 'ඉදිකිරීම්කරු' : 'Builder'}
-                </span>
-                <span className="wiki-stat-val">
-                  {wikiLanguage === 'si' && wikiArticle.si ? wikiArticle.si.stats.builder : wikiArticle.en.stats.builder}
-                </span>
-              </div>
-              <div className="wiki-stat-card">
-                <span className="wiki-stat-label">
-                  {wikiLanguage === 'si' ? 'ඉදිකළ යුගය' : 'Era'}
-                </span>
-                <span className="wiki-stat-val">
-                  {wikiLanguage === 'si' && wikiArticle.si ? wikiArticle.si.stats.era : wikiArticle.en.stats.era}
-                </span>
-              </div>
+              {((wikiLanguage === 'si' && wikiArticle.si?.stats?.builder) || (wikiLanguage === 'en' && wikiArticle.en?.stats?.builder)) && (
+                <div className="wiki-stat-card">
+                  <span className="wiki-stat-label">
+                    {wikiLanguage === 'si' ? 'ඉදිකිරීම්කරු / නිර්මාතෘ' : 'Builder / Creator'}
+                  </span>
+                  <span className="wiki-stat-val">
+                    {wikiLanguage === 'si' && wikiArticle.si ? wikiArticle.si.stats.builder : wikiArticle.en.stats.builder}
+                  </span>
+                </div>
+              )}
+              {((wikiLanguage === 'si' && wikiArticle.si?.stats?.era) || (wikiLanguage === 'en' && wikiArticle.en?.stats?.era)) && (
+                <div className="wiki-stat-card">
+                  <span className="wiki-stat-label">
+                    {wikiLanguage === 'si' ? 'යුගය / කාලසීමාව' : 'Era / Timeframe'}
+                  </span>
+                  <span className="wiki-stat-val">
+                    {wikiLanguage === 'si' && wikiArticle.si ? wikiArticle.si.stats.era : wikiArticle.en.stats.era}
+                  </span>
+                </div>
+              )}
               {wikiArticle.coordinates && (
                 <div className="wiki-stat-card">
                   <span className="wiki-stat-label">
