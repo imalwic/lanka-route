@@ -213,6 +213,7 @@ const parseHistoricalStats = (text) => {
   else if (lowerText.includes('beach') || lowerText.includes('bay') || lowerText.includes('coast') || lowerText.includes('sea')) currentStatus = 'Coastal Area';
   else if (lowerText.includes('lake') || lowerText.includes('reservoir') || lowerText.includes('tank') || lowerText.includes('wewa')) currentStatus = 'Water Body';
   else if (lowerText.includes('mountain') || lowerText.includes('peak') || lowerText.includes('range') || lowerText.includes('hill')) currentStatus = 'Mountain/Peak';
+  else if (lowerText.includes('university') || lowerText.includes('campus') || lowerText.includes('institute') || lowerText.includes('college') || lowerText.includes('school')) currentStatus = 'Educational Institution';
   
   const kingRegexes = [
     /(?:built|constructed|founded|erected|established)\s+(?:by|during the reign of)\s+(?:King\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/i,
@@ -233,7 +234,7 @@ const parseHistoricalStats = (text) => {
 
   const eraRegexes = [
     /(\d+(?:st|nd|rd|th)\s+century\s+(?:BC|AD|BCE|CE))/i,
-    /(?:in|around|circa|built in)\s+(\d{3,4}\s*(?:BC|AD)?)/i
+    /(?:in|around|circa|built in|established in|founded in)\s+(\d{3,4}\s*(?:BC|AD)?)/i
   ];
 
   let era = null;
@@ -332,7 +333,11 @@ const translateStatsToSinhala = (stats) => {
 
   // Final fallback to ensure NO English letters remain if Sinhala is selected
   if (builder && /[a-zA-Z]/.test(builder)) {
-    builder = 'පුරාණ ශ්‍රී ලාංකීය රජවරු';
+    if (stats.currentStatus === 'Educational Institution') {
+      builder = 'නිර්මාතෘවරුන් / බලධාරීන්';
+    } else {
+      builder = 'පුරාණ ශ්‍රී ලාංකීය රජවරු';
+    }
   }
   if (era && /[a-zA-Z]/.test(era)) {
     era = 'පුරාණ යුගය';
@@ -361,6 +366,8 @@ const generateStatusDescription = (status, lang) => {
       return 'මෙම ස්ථානය ප්‍රදේශයේ කෘෂිකාර්මික හා පාරිසරික අවශ්‍යතා සඳහා අතිශය වැදගත් වන ප්‍රධාන ජලාශයක් හෝ ජල මූලාශ්‍රයක් වේ.';
     } else if (status === 'Mountain/Peak') {
       return 'මෙම ප්‍රදේශය කඳුකර භූ විශමතාවයකින් යුත්, ස්වභාව සෞන්දර්යයෙන් අනූන අලංකාර ස්ථානයකි.';
+    } else if (status === 'Educational Institution') {
+      return 'මෙම ස්ථානය ශ්‍රී ලංකාවේ ප්‍රධාන අධ්‍යාපනික ආයතනයක් හෝ විශ්වවිද්‍යාලයක් ලෙස ක්‍රියාත්මක වන අතර, විශාල සිසුන් පිරිසකට උසස් අධ්‍යාපන පහසුකම් සපයයි.';
     } else {
       return 'මෙම ප්‍රදේශය ශ්‍රී ලංකාවේ වැදගත් ස්ථානයක් ලෙස හඳුනාගෙන ඇති අතර නිරන්තරයෙන් සංචාරකයින්ගේ අවධානයට ලක්වී ඇත.';
     }
@@ -379,6 +386,8 @@ const generateStatusDescription = (status, lang) => {
       return 'This location is a significant water body or reservoir, vital for the local environment and agriculture.';
     } else if (status === 'Mountain/Peak') {
       return 'This area is characterized by majestic mountainous terrain and peaks, offering breathtaking scenic beauty.';
+    } else if (status === 'Educational Institution') {
+      return 'This location serves as a major educational institution or university in Sri Lanka, providing higher education facilities to a large number of students.';
     } else {
       return 'This site currently stands as an important landmark in Sri Lanka and remains a major attraction for visitors.';
     }
