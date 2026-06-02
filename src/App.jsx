@@ -175,7 +175,9 @@ const fetchWikiImages = async (title) => {
     if (!res.ok) return [];
     const data = await res.json();
     const pages = data.query?.pages || {};
-    const urls = [];
+    const filteredUrls = [];
+    const fallbackUrls = [];
+    
     Object.values(pages).forEach(page => {
       const info = page.imageinfo?.[0];
       if (info?.url) {
@@ -188,12 +190,15 @@ const fetchWikiImages = async (title) => {
                           !lower.includes('signature') && !lower.includes('coa') && !lower.includes('symbol') &&
                           !lower.includes('plan') && !lower.includes('locator') && !lower.includes('stub');
         
-        if (isPhoto && isNotIcon) {
-          urls.push(fileUrl);
+        if (isPhoto) {
+          fallbackUrls.push(fileUrl);
+          if (isNotIcon) {
+            filteredUrls.push(fileUrl);
+          }
         }
       }
     });
-    return urls;
+    return filteredUrls.length > 0 ? filteredUrls : fallbackUrls;
   } catch (err) {
     console.error('Error fetching wiki images:', err);
     return [];
