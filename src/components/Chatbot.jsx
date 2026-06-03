@@ -40,7 +40,7 @@ const Chatbot = () => {
     try {
       // Construct chat history for Groq (OpenAI compatible)
       const groqMessages = [
-        { role: 'system', content: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). CRITICAL RULE: You MUST reply in the exact same language the user uses. If the user asks in Sinhala (සිංහල), you MUST reply ONLY in Sinhala. If the user asks in English, you MUST reply ONLY in English. NEVER use Tamil or any other languages. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }
+        { role: 'system', content: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). CRITICAL RULE: You MUST reply in the exact same language the user uses. If the user asks in Sinhala (සිංහල), you MUST reply ONLY in Sinhala. If the user asks in English, you MUST reply ONLY in English. NEVER use Tamil or any other languages. DO NOT use any Markdown formatting like **bold** or *italics* in your response. Output PLAIN TEXT ONLY. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }
       ];
 
       for (const m of messages) {
@@ -71,7 +71,9 @@ const Chatbot = () => {
       }
       
       const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || "No response received.";
+      let text = data.choices?.[0]?.message?.content || "No response received.";
+      // Strip markdown bold and italics (asterisks) since we render plain text
+      text = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
 
       setMessages(prev => [...prev, { role: 'ai', content: text }]);
     } catch (error) {
