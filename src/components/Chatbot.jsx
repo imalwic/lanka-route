@@ -43,7 +43,7 @@ const Chatbot = () => {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.5-flash',
         systemInstruction: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). You speak both English and Sinhala perfectly. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka. If the user asks about unrelated topics (e.g. coding, math, general science, politics), politely decline and state that you are specialized only in Sri Lankan travel."
       });
 
