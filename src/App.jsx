@@ -440,8 +440,7 @@ export default function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   
-    const fileInputRef = useRef(null);
-  
+      
   // Trip budget estimation states (LKR)
   const [ratePerKm, setRatePerKm] = useState(() => {
     const saved = localStorage.getItem('lankaroute_rate_per_km');
@@ -2497,13 +2496,7 @@ out body 40;`;
             <>
               {/* History Explorer Search Container */}
               <div className="search-container">
-                {aiPrediction && (
-                  <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '10px', borderRadius: '8px', marginBottom: '12px', fontSize: '11px', color: '#e2e8f0' }}>
-                    <Sparkles size={12} color="#a78bfa" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-                    <strong>AI Vision:</strong> {wikiLanguage === 'si' ? `මෙය ${aiPrediction.si} ලෙස හඳුනාගත්තා. ඊට අදාළ හොඳම ස්ථාන පහතින් පෙන්වා ඇත!` : `Looks like a ${aiPrediction.en}. Here are the best places in Sri Lanka for that:`}
-                    <button onClick={() => setAiPrediction(null)} style={{ float: 'right', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>✕</button>
-                  </div>
-                )}
+                
                 
                 <div className="search-input-wrapper">
                   <Search className="search-icon" size={18} />
@@ -2719,26 +2712,7 @@ out body 40;`;
       {/* Dynamic Leaflet Map Component container */}
       <main className={`map-wrapper ${(activeTab === 'explorer' && wikiArticle) ? 'hide-map' : ''}`}>
         
-        {/* Floating AI Vision Upload Button */}
-        <button 
-          className="map-theme-toggle-icon-only"
-          style={{ top: '90px' }}
-          onClick={() => fileInputRef.current.click()}
-          title="Upload photo for AI Recognition / පින්තූරයෙන් හඳුනාගන්න"
-        >
-          <input 
-            type="file" 
-            accept="image/*" 
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            onChange={handleImageUpload}
-          />
-          {isAiLoading ? (
-            <Loader size={16} className="spin-anim" style={{ color: '#8b5cf6' }} />
-          ) : (
-            <Camera size={16} className="theme-toggle-icon" style={{ color: '#8b5cf6' }} />
-          )}
-        </button>
+        
 
         {/* Floating Map Theme Toggle Button */}
         <button 
