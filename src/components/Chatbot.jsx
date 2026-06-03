@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, User, Bot, AlertTriangle } from 'lucide-react';
+import { MessageCircle, X, Send, User, Bot, AlertTriangle, Copy, Check } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const Chatbot = () => {
@@ -8,6 +8,7 @@ const Chatbot = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(true);
+  const [copiedIndex, setCopiedIndex] = useState(null);
   const messagesEndRef = useRef(null);
 
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
@@ -91,6 +92,12 @@ const Chatbot = () => {
     }
   };
 
+  const handleCopy = (text, idx) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(idx);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
   return (
     <>
       {/* Floating Button */}
@@ -127,6 +134,18 @@ const Chatbot = () => {
                 <div className="chat-message-content">
                   {/* Basic markdown rendering for links/bold could be added here. Using dangerouslySetInnerHTML is risky, so we just render plain text or simple parsing. */}
                   {msg.content}
+                  {msg.role === 'ai' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                      <button 
+                        className="copy-btn" 
+                        onClick={() => handleCopy(msg.content, idx)}
+                        title="Copy to clipboard"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '4px', padding: '4px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.2s' }}
+                      >
+                        {copiedIndex === idx ? <Check size={12} color="#10b981" /> : <Copy size={12} color="#94a3b8" />}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
