@@ -48,12 +48,17 @@ const Chatbot = () => {
       });
 
       // Construct chat history for Gemini
-      const chatHistory = messages
-        .filter(m => m.role !== 'system')
-        .map(m => ({
-          role: m.role === 'user' ? 'user' : 'model',
+      const chatHistory = [];
+      for (const m of messages) {
+        if (m.role === 'system') continue;
+        const mappedRole = m.role === 'user' ? 'user' : 'model';
+        // Gemini API strictly requires the first history item to be from 'user'
+        if (chatHistory.length === 0 && mappedRole === 'model') continue;
+        chatHistory.push({
+          role: mappedRole,
           parts: [{ text: m.content }]
-        }));
+        });
+      }
 
       const chat = model.startChat({
         history: chatHistory,
@@ -66,7 +71,7 @@ const Chatbot = () => {
       setMessages(prev => [...prev, { role: 'ai', content: text }]);
     } catch (error) {
       console.error('Gemini API Error:', error);
-      setMessages(prev => [...prev, { role: 'system', content: '❌ Error: Failed to get a response from the AI. Please check your API key or internet connection.' }]);
+      setMessages(prev => [...prev, { role: 'system', content: `❌ Error: Failed to get a response from the AI.\nDetails: ${error.message}` }]);
     } finally {
       setIsLoading(false);
     }
