@@ -10,13 +10,13 @@ const Chatbot = () => {
   const [hasApiKey, setHasApiKey] = useState(true);
   const messagesEndRef = useRef(null);
 
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
   useEffect(() => {
-    if (!apiKey || apiKey === 'your_openai_key_here') {
+    if (!apiKey || apiKey === 'your_groq_key_here') {
       setHasApiKey(false);
       setMessages([
-        { role: 'system', content: '⚠️ **API Key Missing**\nTo use this AI, please add your OpenAI API key to the `.env.local` file:\n`VITE_OPENAI_API_KEY=sk-...`\n\nYou can get a key from [OpenAI Platform](https://platform.openai.com/api-keys).' }
+        { role: 'system', content: '⚠️ **API Key Missing**\nTo use this completely FREE AI, please add your Groq API key to the `.env.local` file:\n`VITE_GROQ_API_KEY=gsk_...`\n\nYou can get a free key from [Groq Console](https://console.groq.com/keys).' }
       ]);
     } else {
       setMessages([
@@ -38,30 +38,30 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      // Construct chat history for OpenAI
-      const openAIMessages = [
+      // Construct chat history for Groq (OpenAI compatible)
+      const groqMessages = [
         { role: 'system', content: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). You speak both English and Sinhala perfectly. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }
       ];
 
       for (const m of messages) {
         if (m.role === 'system') continue;
-        openAIMessages.push({
+        groqMessages.push({
           role: m.role === 'ai' ? 'assistant' : 'user',
           content: m.content
         });
       }
 
-      openAIMessages.push({ role: 'user', content: userMsg });
+      groqMessages.push({ role: 'user', content: userMsg });
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: openAIMessages
+          model: 'llama3-8b-8192',
+          messages: groqMessages
         })
       });
 
@@ -75,7 +75,7 @@ const Chatbot = () => {
 
       setMessages(prev => [...prev, { role: 'ai', content: text }]);
     } catch (error) {
-      console.error('OpenAI API Error:', error);
+      console.error('Groq API Error:', error);
       setMessages(prev => [...prev, { role: 'system', content: `❌ Error: Failed to get a response from the AI.\nDetails: ${error.message}` }]);
     } finally {
       setIsLoading(false);
