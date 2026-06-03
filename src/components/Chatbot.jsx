@@ -41,11 +41,6 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-3.5-flash',
-        systemInstruction: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). You speak both English and Sinhala perfectly. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka. If the user asks about unrelated topics (e.g. coding, math, general science, politics), politely decline and state that you are specialized only in Sri Lankan travel."
-      });
 
       // Construct chat history for Gemini
       const chatHistory = [];
@@ -60,13 +55,30 @@ const Chatbot = () => {
         });
       }
 
-      const chat = model.startChat({
-        history: chatHistory,
+      chatHistory.push({
+        role: 'user',
+        parts: [{ text: userMsg }]
       });
 
-      const result = await chat.sendMessage(userMsg);
-      const response = await result.response;
-      const text = response.text();
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: chatHistory,
+          systemInstruction: { parts: [{ text: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). You speak both English and Sinhala perfectly. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }] }
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 503) {
+           throw new Error("AI Server is busy (High Demand). Please try again in a few minutes.");
+        }
+        throw new Error(errData.error?.message || `HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
 
       setMessages(prev => [...prev, { role: 'ai', content: text }]);
     } catch (error) {
