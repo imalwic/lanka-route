@@ -40,7 +40,7 @@ const Chatbot = () => {
     try {
       // Construct chat history for Groq (OpenAI compatible)
       const groqMessages = [
-        { role: 'system', content: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). You speak both English and Sinhala perfectly. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }
+        { role: 'system', content: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). CRITICAL RULE: You MUST reply in the exact same language the user uses. If the user asks in Sinhala (සිංහල), you MUST reply ONLY in Sinhala. If the user asks in English, you MUST reply ONLY in English. NEVER use Tamil or any other languages. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }
       ];
 
       for (const m of messages) {
@@ -60,7 +60,7 @@ const Chatbot = () => {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'llama-3.3-70b-versatile',
           messages: groqMessages
         })
       });
