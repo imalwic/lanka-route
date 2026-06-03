@@ -308,13 +308,13 @@ const translateStatsToSinhala = (stats) => {
   let currentStatus = stats.currentStatus || 'Historical Monument';
 
   Object.entries(dict).forEach(([key, val]) => {
-    if (builder.toLowerCase().includes(key.toLowerCase())) {
+    if (builder && builder.toLowerCase().includes(key.toLowerCase())) {
       builder = val;
     }
-    if (era.toLowerCase().includes(key.toLowerCase())) {
+    if (era && era.toLowerCase().includes(key.toLowerCase())) {
       era = val;
     }
-    if (currentStatus.toLowerCase() === key.toLowerCase()) {
+    if (currentStatus && currentStatus.toLowerCase() === key.toLowerCase()) {
       currentStatus = val;
     }
   });
@@ -1250,44 +1250,72 @@ out body 40;`;
 
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(val + ' Sri Lanka')}&format=json&origin=*`;
-        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&countrycodes=lk&limit=5`;
+        const isSi = /[\u0D80-\u0DFF]/.test(val);
+        const wikiDomain = isSi ? 'si.wikipedia.org' : 'en.wikipedia.org';
+        const wikiQuery = isSi ? val : val + ' Sri Lanka';
         
-        const [wikiRes, nomRes] = await Promise.all([
+        const wikiUrl = `https://${wikiDomain}/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiQuery)}&gsrlimit=8&prop=coordinates|extracts&exchars=150&exintro=1&explaintext=1&format=json&origin=*`;
+        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&countrycodes=lk&limit=5&accept-language=${isSi ? 'si' : 'en'}`;
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(val)}&lat=7.8731&lon=80.7718&limit=5`;
+        
+        const [wikiRes, nomRes, photonRes] = await Promise.all([
           fetch(wikiUrl).catch(() => ({ ok: false })),
-          fetch(nomUrl).catch(() => ({ ok: false }))
+          fetch(nomUrl).catch(() => ({ ok: false })),
+          fetch(photonUrl).catch(() => ({ ok: false }))
         ]);
         
         let combined = [];
 
         if (wikiRes.ok) {
           const wikiData = await wikiRes.json();
-          const list = wikiData.query?.search || [];
-          combined = list.map(item => ({
+          const pages = Object.values(wikiData.query?.pages || {});
+          const places = pages.filter(p => p.coordinates);
+          places.sort((a, b) => a.index - b.index);
+          
+          combined = places.map(item => ({
             title: item.title,
-            snippet: item.snippet.replace(/<\/?[^>]+(>|$)/g, ""),
+            snippet: item.extract ? item.extract.substring(0, 100) + '...' : '',
             source: 'wikipedia'
           }));
         }
         
-        if (nomRes.ok) {
+        let geoList = [];
+        
+        if (photonRes.ok) {
+          const photonData = await photonRes.json();
+          geoList = (photonData.features || [])
+            .filter(f => f.properties && f.properties.countrycode === 'LK')
+            .map(f => ({
+              title: f.properties.name || f.properties.street || 'Location',
+              snippet: [f.properties.district, f.properties.city, f.properties.state].filter(Boolean).join(', ').replace(/ District/g, ''),
+              source: 'photon',
+              lat: f.geometry.coordinates[1],
+              lon: f.geometry.coordinates[0],
+              osm_type: f.properties.osm_type,
+              osm_id: f.properties.osm_id
+            }));
+        }
+        
+        if (nomRes.ok && geoList.length === 0) {
           const nomData = await nomRes.json();
-          const nomList = nomData.map(item => ({
+          geoList = nomData.map(item => ({
             title: item.name || item.display_name.split(',')[0],
             snippet: item.display_name,
             source: 'nominatim',
             lat: parseFloat(item.lat),
-            lon: parseFloat(item.lon)
+            lon: parseFloat(item.lon),
+            osm_type: item.osm_type,
+            osm_id: item.osm_id
           }));
-          
-          const existingTitles = new Set(combined.map(c => c.title.toLowerCase()));
-          nomList.forEach(n => {
-            if (!existingTitles.has(n.title.toLowerCase())) {
-              combined.push(n);
-              existingTitles.add(n.title.toLowerCase());
-            }
-          });
         }
+          
+        const existingTitles = new Set(combined.map(c => c.title.toLowerCase()));
+        geoList.forEach(n => {
+          if (!existingTitles.has(n.title.toLowerCase())) {
+            combined.push(n);
+            existingTitles.add(n.title.toLowerCase());
+          }
+        });
         
         setWikiSuggestions(combined);
       } catch (err) {
@@ -1308,8 +1336,11 @@ out body 40;`;
     setActiveWikiImageIndex(0);
     setWikiLanguage('en'); // Reset default language to English when loading a new article
     try {
-      // Query English article with langlinks for 'si'
-      const detailsUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts|coordinates|pageimages|langlinks&lllang=si&explaintext=1&pithumbsize=800&format=json&origin=*&redirects=1`;
+      const isSi = /[\u0D80-\u0DFF]/.test(title);
+      const primaryDomain = isSi ? 'si.wikipedia.org' : 'en.wikipedia.org';
+      const secondaryLang = isSi ? 'en' : 'si';
+      
+      const detailsUrl = `https://${primaryDomain}/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(title)}&gsrlimit=1&prop=extracts|coordinates|pageimages|langlinks&lllang=${secondaryLang}&explaintext=1&pithumbsize=800&format=json&origin=*&redirects=1`;
       const detailsRes = await fetch(detailsUrl);
       if (!detailsRes.ok) throw new Error('Failed to load article details');
       
@@ -1321,17 +1352,45 @@ out body 40;`;
       }
       
       const page = pages[pageId];
-      const extractText = page.extract || '';
+      const primaryText = page.extract || '';
       const coordinates = page.coordinates?.[0] || nomCoords;
       const mainThumbnail = page.thumbnail?.source || null;
 
-      // Extract Sinhala title if it exists in langlinks
       const langlinks = page.langlinks || [];
-      const sinhalaTitleObj = langlinks.find(link => link.lang === 'si');
-      const sinhalaTitle = sinhalaTitleObj ? sinhalaTitleObj['*'] : null;
+      const secondaryTitleObj = langlinks.find(link => link.lang === secondaryLang);
+      const secondaryTitle = secondaryTitleObj ? secondaryTitleObj['*'] : null;
 
-      const parsedSections = parseWikiSections(extractText);
-      const imagesList = await fetchWikiImages(title);
+      const enTitle = isSi ? secondaryTitle : page.title;
+      const sinhalaTitle = isSi ? page.title : secondaryTitle;
+
+      let enText = isSi ? '' : primaryText;
+      let siText = isSi ? primaryText : '';
+
+      if (secondaryTitle) {
+        try {
+          const secDomain = isSi ? 'en.wikipedia.org' : 'si.wikipedia.org';
+          const secUrl = `https://${secDomain}/w/api.php?action=query&titles=${encodeURIComponent(secondaryTitle)}&prop=extracts&explaintext=1&format=json&origin=*&redirects=1`;
+          const secRes = await fetch(secUrl);
+          if (secRes.ok) {
+            const secData = await secRes.json();
+            const secPages = secData.query?.pages || {};
+            const secPageId = Object.keys(secPages)[0];
+            if (secPageId !== '-1') {
+              const secExtract = secPages[secPageId].extract || '';
+              if (isSi) enText = secExtract;
+              else siText = secExtract;
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to load secondary page content:', err);
+        }
+      }
+
+      const parsedSections = parseWikiSections(enText);
+      const parsedSinhalaSections = parseWikiSections(siText);
+      
+      // Fetch images using English title if available (Commons images are linked to en wiki more robustly)
+      const imagesList = await fetchWikiImages(enTitle || sinhalaTitle || title);
       
       let allImages = [...imagesList];
       if (mainThumbnail && !allImages.includes(mainThumbnail)) {
@@ -1340,33 +1399,14 @@ out body 40;`;
 
       let stats = { builder: null, era: null, currentStatus: 'General Location' };
       try {
-        stats = parseHistoricalStats(extractText) || stats;
+        stats = parseHistoricalStats(enText) || stats;
       } catch (e) {
         console.error('Error parsing stats:', e);
       }
-
-      // Attempt to load Sinhala page content from si.wikipedia.org if Sinhala link exists
-      let sinhalaContent = null;
-      let parsedSinhalaSections = [];
+      
       let sinhalaStats = null;
-
-      if (sinhalaTitle) {
-        try {
-          const siUrl = `https://si.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(sinhalaTitle)}&prop=extracts&explaintext=1&format=json&origin=*&redirects=1`;
-          const siRes = await fetch(siUrl);
-          if (siRes.ok) {
-            const siData = await siRes.json();
-            const siPages = siData.query?.pages || {};
-            const siPageId = Object.keys(siPages)[0];
-            if (siPageId !== '-1') {
-              sinhalaContent = siPages[siPageId].extract || '';
-              parsedSinhalaSections = parseWikiSections(sinhalaContent);
-              sinhalaStats = translateStatsToSinhala(stats);
-            }
-          }
-        } catch (siErr) {
-          console.warn('Failed to load Sinhala page content:', siErr);
-        }
+      if (siText) {
+        sinhalaStats = translateStatsToSinhala(stats);
       }
 
       let enrichedSinhalaSections = [];
@@ -1388,15 +1428,135 @@ out body 40;`;
         console.error('Error translating stats:', e);
       }
 
+      // Fetch OSM extra tags
+      let osmTags = null;
+      if (typeof suggestion === 'object' && suggestion.osm_type && suggestion.osm_id) {
+        try {
+          const detUrl = `https://nominatim.openstreetmap.org/details?osmtype=${suggestion.osm_type.charAt(0).toUpperCase()}&osmid=${suggestion.osm_id}&format=json&extratags=1`;
+          const detRes = await fetch(detUrl, { headers: { 'User-Agent': 'LankaRoute/1.0' } });
+          if (detRes.ok) {
+            const detData = await detRes.json();
+            if (detData.extratags) {
+              osmTags = detData.extratags;
+            }
+          }
+        } catch(e) { console.warn('OSM Details error', e); }
+      }
+
+      // Fetch Wikivoyage data
+      let wvText = '';
+      try {
+        const wvTarget = (typeof suggestion === 'object' && suggestion.snippet) 
+           ? suggestion.snippet.split(',')[0] // Get the city/district
+           : (enTitle || sinhalaTitle || title);
+           
+        const wvUrl = `https://en.wikivoyage.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wvTarget)}&gsrlimit=1&prop=extracts&explaintext=1&format=json&origin=*`;
+        const wvRes = await fetch(wvUrl);
+        if (wvRes.ok) {
+           const wvData = await wvRes.json();
+           const wvPages = wvData.query?.pages || {};
+           const wvPageId = Object.keys(wvPages)[0];
+           if (wvPageId && wvPageId !== '-1') {
+             wvText = wvPages[wvPageId].extract || '';
+           }
+        }
+      } catch (err) {
+        console.warn('Wikivoyage error:', err);
+      }
+
+      const wvSections = parseWikiSections(wvText);
+      const usefulWvSections = wvSections.filter(s => 
+         /Get in|See|Eat|Sleep|Drink|Go next|Do|Understand/i.test(s.title)
+      );
+
+      // Translate Wikivoyage content to Sinhala dynamically
+      const translateToSinhala = async (text) => {
+        if (!text) return '';
+        try {
+          const paragraphs = text.split('\n');
+          const translatedParas = await Promise.all(paragraphs.map(async (p) => {
+            if (!p.trim()) return '';
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=si&dt=t&q=${encodeURIComponent(p)}`;
+            try {
+              const res = await fetch(url);
+              if (!res.ok) return p;
+              const data = await res.json();
+              if (data && data[0]) {
+                return data[0].map(item => item[0]).join('');
+              }
+            } catch (err) { return p; }
+            return p;
+          }));
+          return translatedParas.join('\n');
+        } catch (e) {
+          console.warn('Translation failed:', e);
+          return text;
+        }
+      };
+
+      const translatedWvSections = await Promise.all(
+        usefulWvSections.map(async (sec) => {
+           const translatedContent = await translateToSinhala(sec.content);
+           return { ...sec, siContent: translatedContent };
+        })
+      );
+
+      let osmEnContent = '';
+      let osmSiContent = '';
+      if (osmTags) {
+        const formatRow = (labelEn, labelSi, val) => {
+           if (!val) return '';
+           osmEnContent += `• ${labelEn}: ${val}\n`;
+           osmSiContent += `• ${labelSi}: ${val}\n`;
+        };
+        formatRow('Website', 'වෙබ් අඩවිය', osmTags.website);
+        formatRow('Phone', 'දුරකථන අංකය', osmTags.phone || osmTags['contact:phone']);
+        formatRow('Opening Hours', 'විවෘත වේලාවන්', osmTags.opening_hours);
+        formatRow('Fee', 'ගාස්තු', osmTags.fee || osmTags.charge);
+        formatRow('Wheelchair Access', 'රෝද පුටු පහසුකම්', osmTags.wheelchair);
+        formatRow('Email', 'විද්‍යුත් තැපෑල', osmTags.email || osmTags['contact:email']);
+      }
+
       // Append dynamic status sections
       const finalEnSections = [...parsedSections];
       if (enStatusDesc) {
         finalEnSections.push({ title: 'Current Status', content: enStatusDesc });
       }
+      if (osmEnContent) {
+        finalEnSections.push({ title: 'Quick Info (OpenStreetMap)', content: osmEnContent });
+      }
+      if (translatedWvSections.length > 0) {
+        translatedWvSections.forEach(s => {
+          finalEnSections.push({ title: `Travel Guide - ${s.title}`, content: s.content });
+        });
+      }
       
       const finalSiSections = [...enrichedSinhalaSections];
       if (siStatusDesc && !finalSiSections.some(s => s.title.includes('තත්ත්වය'))) {
         finalSiSections.push({ title: 'වර්තමාන තත්ත්වය (Current Status)', content: siStatusDesc });
+      }
+      if (osmSiContent) {
+        finalSiSections.push({ title: 'අමතර තොරතුරු (Quick Info)', content: osmSiContent });
+      }
+      
+      const translateWvTitle = (t) => {
+        const lower = t.toLowerCase();
+        if (lower.includes('get in')) return 'ගමන් මාර්ග (Get in)';
+        if (lower.includes('see')) return 'නැරඹිය යුතු දෑ (See)';
+        if (lower.includes('eat')) return 'ආහාර පාන (Eat)';
+        if (lower.includes('sleep')) return 'නවාතැන් (Sleep)';
+        if (lower.includes('drink')) return 'පානයන් (Drink)';
+        if (lower.includes('go next')) return 'මීළඟ ගමනාන්ත (Go next)';
+        if (lower.includes('do')) return 'කළ යුතු දෑ (Do)';
+        if (lower.includes('understand')) return 'අවබෝධයක් (Understand)';
+        if (lower.includes('buy')) return 'මිලදී ගැනීම් (Buy)';
+        return t;
+      };
+
+      if (translatedWvSections.length > 0) {
+        translatedWvSections.forEach(s => {
+          finalSiSections.push({ title: `සංචාරක මඟපෙන්වීම - ${translateWvTitle(s.title)}`, content: s.siContent });
+        });
       }
 
       setWikiArticle({
