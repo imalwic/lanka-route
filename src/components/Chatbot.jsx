@@ -84,11 +84,12 @@ const Chatbot = () => {
       {/* Floating Button */}
       {!isOpen && (
         <button 
-          className="chatbot-toggle-btn"
+          className="chatbot-toggle-btn pulse-animation"
           onClick={() => setIsOpen(true)}
-          title="Open AI Travel Assistant"
+          title="LankaRoute AI Travel Assistant"
         >
-          <MessageCircle size={24} color="#fff" />
+          <Bot size={28} color="#fff" strokeWidth={1.5} />
+          <div className="online-indicator"></div>
         </button>
       )}
 
