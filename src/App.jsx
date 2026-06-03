@@ -131,16 +131,17 @@ const POPULAR_HISTORICAL_SITES = [
 ];
 
 // Helper to parse Wikipedia extracts into sections
-const parseWikiSections = (text) => {
+const parseWikiSections = (text, isSi = false) => {
   if (!text) return [];
   const lines = text.split('\n');
   const sections = [];
-  let currentSection = { title: 'Overview', content: [] };
+  const defaultTitle = isSi ? 'සාරාංශය (Overview)' : 'Overview';
+  let currentSection = { title: defaultTitle, content: [] };
   
   lines.forEach(line => {
     const match = line.match(/^==+\s*(.*?)\s*==+/);
     if (match) {
-      if (currentSection.content.length > 0 || currentSection.title !== 'Overview') {
+      if (currentSection.content.length > 0 || currentSection.title !== defaultTitle) {
         sections.push({
           title: currentSection.title,
           content: currentSection.content.join('\n').trim()
@@ -152,7 +153,7 @@ const parseWikiSections = (text) => {
     }
   });
   
-  if (currentSection.content.length > 0 || currentSection.title !== 'Overview') {
+  if (currentSection.content.length > 0 || currentSection.title !== defaultTitle) {
     sections.push({
       title: currentSection.title,
       content: currentSection.content.join('\n').trim()
@@ -604,36 +605,49 @@ export default function App() {
       const article = wikiLanguage === 'si' ? wikiArticle.si : wikiArticle.en;
       if (!article || !article.sections || article.sections.length === 0) return;
       
-      const validSections = article.sections.filter(s => 
-         !s.isRaw && 
-         !s.title.includes('Quick Info') && 
-         !s.title.includes('Travel Guide') &&
-         !s.title.includes('අමතර තොරතුරු') &&
-         !s.title.includes('සංචාරක මඟපෙන්වීම') &&
-         !s.title.includes('වර්තමාන තත්ත්වය') &&
-         !s.title.includes('Current Status')
-      );
+      const validSections = article.sections.filter(s => !s.isRaw);
       
-      const speakText = validSections.map(s => s.content).join(". ");
+      const speakText = validSections.map(s => {
+          let spokenTitle = s.title;
+          if (wikiLanguage === 'si') {
+              spokenTitle = spokenTitle.replace(/\(.*?\)/g, '').replace(/[a-zA-Z]/g, '').trim();
+          }
+          return `${spokenTitle}. ${s.content}`;
+      }).join(wikiLanguage === 'si' ? " ---PAUSE---. " : " ");
       const cleanText = speakText.replace(/#/g, '').replace(/•/g, '').replace(/\*/g, '');
       
       if (wikiLanguage === 'si') {
           // Google Translate TTS fallback for Sinhala
-          const words = cleanText.split(' ');
+          // Smart Chunking Algorithm by Sentences (Prevents mid-sentence delays)
+          const rawChunks = cleanText.replace(/([.!?])\s+/g, "$1|").split("|");
           const chunks = [];
-          let curr = "";
-          for (const w of words) {
-              if (curr.length + w.length + 1 > 120) { // Changed to 120 chars as requested
-                  if (curr.trim().length > 0) chunks.push(curr.trim());
-                  curr = w;
+          
+          rawChunks.forEach(sentence => {
+              let s = sentence.trim();
+              if (!s) return;
+              
+              if (s.length < 110) {
+                  chunks.push(s);
               } else {
-                  curr += (curr.length > 0 ? " " : "") + w;
+                  const parts = s.split(/,| සහ | හා | නිසා | බැවින් |\n/);
+                  let temp = "";
+                  for (let i = 0; i < parts.length; i++) {
+                      let p = parts[i].trim();
+                      if (!p) continue;
+                      if (temp.length + p.length < 110) {
+                          temp += (temp ? " " : "") + p;
+                      } else {
+                          if (temp) chunks.push(temp.trim());
+                          temp = p;
+                      }
+                  }
+                  if (temp) chunks.push(temp.trim());
               }
-          }
-          if (curr.trim().length > 0) chunks.push(curr.trim());
+          });
           
           window.aiVoiceChunks = chunks.filter(c => c.length > 0);
           window.aiVoiceIndex = 0;
+
           if (!window.aiVoiceAudio) {
               window.aiVoiceAudio = new Audio();
           }
@@ -645,29 +659,44 @@ export default function App() {
                   return;
               }
               const chunk = window.aiVoiceChunks[window.aiVoiceIndex];
+              
+              // Handle artificial pause marker between sections
+              if (chunk.includes("---PAUSE---")) {
+                  window.aiVoiceIndex++;
+                  setTimeout(playNext, 1200); // 1.2 second pause between sections
+                  return;
+              }
+              
               const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=si&client=tw-ob`;
               
               window.aiVoiceAudio.src = url;
               window.aiVoiceAudio.load(); // Force load
               
+              // Sequentially preload the NEXT chunk only to prevent rate limits
+              if (window.aiVoiceIndex + 1 < window.aiVoiceChunks.length) {
+                  const nextChunk = window.aiVoiceChunks[window.aiVoiceIndex + 1];
+                  const nextUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(nextChunk)}&tl=si&client=tw-ob`;
+                  fetch(nextUrl, {mode: 'no-cors'}).catch(() => {});
+              }
+              
               window.aiVoiceAudio.onended = () => {
                   window.aiVoiceIndex++;
-                  playNext();
+                  playNext(); // Immediately play next since it's already cached!
               };
               window.aiVoiceAudio.onerror = (e) => {
                   console.warn("TTS Error, skipping chunk:", chunk);
                   window.aiVoiceIndex++;
-                  setTimeout(playNext, 100); // Add small delay before next chunk to prevent rapid fire errors
+                  setTimeout(playNext, 50);
               };
               
-              // We need a slight delay before calling play() when src changes, sometimes browsers need a tick
+              // We need a slight delay before calling play() when src changes
               setTimeout(() => {
                   window.aiVoiceAudio.play().catch(e => {
                       console.warn("Audio play blocked", e);
                       window.aiVoiceIndex++;
-                      setTimeout(playNext, 100);
+                      setTimeout(playNext, 50);
                   });
-              }, 50);
+              }, 20);
           };
           
           setIsSpeaking(true);
@@ -1622,8 +1651,8 @@ out body 40;`;
         }
       }
 
-      const parsedSections = parseWikiSections(enText);
-      const parsedSinhalaSections = parseWikiSections(siText);
+      const parsedSections = parseWikiSections(enText, false);
+      const parsedSinhalaSections = parseWikiSections(siText, true);
       
       // Fetch images using English title if available (Commons images are linked to en wiki more robustly)
       const imagesList = await fetchWikiImages(enTitle || sinhalaTitle || title);
