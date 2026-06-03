@@ -27,8 +27,6 @@ import {
   Loader
 } from 'lucide-react';
 
-import * as tf from '@tensorflow/tfjs';
-import * as mobilenet from '@tensorflow-models/mobilenet';
 
 import { 
   getOSRMMatrices, 
@@ -442,9 +440,7 @@ export default function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiPrediction, setAiPrediction] = useState(null);
-  const fileInputRef = useRef(null);
+    const fileInputRef = useRef(null);
   
   // Trip budget estimation states (LKR)
   const [ratePerKm, setRatePerKm] = useState(() => {
@@ -489,87 +485,6 @@ export default function App() {
   const [wikiArticle, setWikiArticle] = useState(null);
   const [wikiLanguage, setWikiLanguage] = useState('en');
   const [activeWikiImageIndex, setActiveWikiImageIndex] = useState(0);
-
-  // AI Image Recognition logic
-  const handleImageUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setActiveTab('explorer');
-    setWikiSearchQuery(wikiLanguage === 'si' ? 'AI මඟින් ඡායාරූපය පරික්ෂා කරමින්...' : 'AI Vision: Analyzing Image...');
-    setIsAiLoading(true);
-    setAiPrediction(null);
-    
-    try {
-      const img = document.createElement('img');
-      img.src = URL.createObjectURL(file);
-      await new Promise(resolve => img.onload = resolve);
-      
-      img.width = img.naturalWidth || 224;
-      img.height = img.naturalHeight || 224;
-      
-      const model = await mobilenet.load();
-      const predictions = await model.classify(img);
-      
-      if (predictions && predictions.length > 0) {
-        const topPrediction = predictions[0].className.toLowerCase();
-        
-        let searchKeyword = 'Landmark';
-        let siLabel = 'ස්ථානයක්';
-        
-        if (topPrediction.includes('seashore') || topPrediction.includes('coast') || topPrediction.includes('promontory')) {
-          searchKeyword = 'Beach';
-          siLabel = 'මුහුදු වෙරළක්';
-        } else if (topPrediction.includes('valley') || topPrediction.includes('alp') || topPrediction.includes('mountain') || topPrediction.includes('cliff') || topPrediction.includes('volcano')) {
-          searchKeyword = 'Mountain';
-          siLabel = 'කන්දක් හෝ කඳුකරයක්';
-        } else if (topPrediction.includes('palace') || topPrediction.includes('castle') || topPrediction.includes('megalith') || topPrediction.includes('monastery') || topPrediction.includes('ruin')) {
-          searchKeyword = 'Ruins';
-          siLabel = 'ඓතිහාසික ස්ථානයක්';
-        } else if (topPrediction.includes('stupa') || topPrediction.includes('church') || topPrediction.includes('mosque') || topPrediction.includes('dome') || topPrediction.includes('beacon') || topPrediction.includes('temple')) {
-          searchKeyword = 'Temple';
-          siLabel = 'පූජනීය ස්ථානයක්';
-        } else if (topPrediction.includes('lakeside') || topPrediction.includes('dam') || topPrediction.includes('breakwater') || topPrediction.includes('pier')) {
-          searchKeyword = 'Lake';
-          siLabel = 'ජලාශයක්';
-        } else if (topPrediction.includes('restaurant') || topPrediction.includes('dining')) {
-          searchKeyword = 'Restaurant';
-          siLabel = 'ආපන ශාලාවක්';
-        } else if (topPrediction.includes('hotel')) {
-          searchKeyword = 'Hotel';
-          siLabel = 'හෝටලයක්';
-        }
-        
-        setAiPrediction({ en: searchKeyword, si: siLabel, raw: topPrediction });
-        setWikiSearchQuery(searchKeyword);
-        setActiveTab('explorer');
-        
-        // Auto search
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchKeyword)}&lat=7.8731&lon=80.7718&limit=10`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          const list = (data.features || [])
-            .filter(f => f.properties && f.properties.countrycode === 'LK')
-            .map(f => ({
-              title: f.properties.name || f.properties.street || 'Location',
-              snippet: [f.properties.district, f.properties.city, f.properties.state].filter(Boolean).join(', ').replace(/ District/g, ''),
-              source: 'photon',
-              lat: f.geometry.coordinates[1],
-              lon: f.geometry.coordinates[0],
-              osm_type: f.properties.osm_type,
-              osm_id: f.properties.osm_id
-            }));
-          setWikiSuggestions(list);
-        }
-      }
-    } catch (err) {
-      console.error('AI Image error', err);
-      alert('Error analyzing image. Please try again.');
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
 
   // AI Voice Guide logic
   const handleSpeechStop = () => {
