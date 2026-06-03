@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
+import Chatbot from './components/Chatbot';
 import { 
   MapPin, 
   Navigation, 
@@ -2924,6 +2925,7 @@ out body 40;`;
           </div>
         </main>
       )}
+      <Chatbot />
     </div>
   );
 }
