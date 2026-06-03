@@ -218,7 +218,7 @@ const Chatbot = () => {
           </div>
 
           {showHistory ? (
-            <div className="chatbot-history-panel" style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+            <div className="chatbot-history-panel" style={{ flex: 1, overflowY: 'auto', padding: '12px', background: '#0b1120' }}>
               {chats.map(chat => (
                 <div 
                   key={chat.id} 
