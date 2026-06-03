@@ -10,16 +10,13 @@ const Chatbot = () => {
   const [hasApiKey, setHasApiKey] = useState(true);
   const messagesEndRef = useRef(null);
 
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
   useEffect(() => {
-    if (!apiKey || apiKey === 'your_key_here') {
+    if (!apiKey || apiKey === 'your_openai_key_here') {
       setHasApiKey(false);
       setMessages([
-        { 
-          role: 'system', 
-          content: 'Welcome to LankaRoute AI Travel Guide! \n\n⚠️ **API Key Missing** \nTo use this free AI, please create a `.env.local` file in the project folder and add your Google Gemini API key like this:\n`VITE_GEMINI_API_KEY=AIzaSy...`\n\nYou can get a free key from [Google AI Studio](https://aistudio.google.com/).'
-        }
+        { role: 'system', content: '⚠️ **API Key Missing**\nTo use this AI, please add your OpenAI API key to the `.env.local` file:\n`VITE_OPENAI_API_KEY=sk-...`\n\nYou can get a key from [OpenAI Platform](https://platform.openai.com/api-keys).' }
       ]);
     } else {
       setMessages([
@@ -41,48 +38,44 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
+      // Construct chat history for OpenAI
+      const openAIMessages = [
+        { role: 'system', content: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). You speak both English and Sinhala perfectly. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }
+      ];
 
-      // Construct chat history for Gemini
-      const chatHistory = [];
       for (const m of messages) {
         if (m.role === 'system') continue;
-        const mappedRole = m.role === 'user' ? 'user' : 'model';
-        // Gemini API strictly requires the first history item to be from 'user'
-        if (chatHistory.length === 0 && mappedRole === 'model') continue;
-        chatHistory.push({
-          role: mappedRole,
-          parts: [{ text: m.content }]
+        openAIMessages.push({
+          role: m.role === 'ai' ? 'assistant' : 'user',
+          content: m.content
         });
       }
 
-      chatHistory.push({
-        role: 'user',
-        parts: [{ text: userMsg }]
-      });
+      openAIMessages.push({ role: 'user', content: userMsg });
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify({
-          contents: chatHistory,
-          systemInstruction: { parts: [{ text: "You are an expert travel assistant exclusively for Sri Lanka tourism (LankaRoute). You speak both English and Sinhala perfectly. ONLY answer questions related to travel, tourism, places to visit, history, routes, and culture in Sri Lanka." }] }
+          model: 'gpt-3.5-turbo',
+          messages: openAIMessages
         })
       });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        if (response.status === 503) {
-           throw new Error("AI Server is busy (High Demand). Please try again in a few minutes.");
-        }
         throw new Error(errData.error?.message || `HTTP ${response.status}`);
       }
       
       const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
+      const text = data.choices?.[0]?.message?.content || "No response received.";
 
       setMessages(prev => [...prev, { role: 'ai', content: text }]);
     } catch (error) {
-      console.error('Gemini API Error:', error);
+      console.error('OpenAI API Error:', error);
       setMessages(prev => [...prev, { role: 'system', content: `❌ Error: Failed to get a response from the AI.\nDetails: ${error.message}` }]);
     } finally {
       setIsLoading(false);
