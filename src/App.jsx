@@ -20,8 +20,15 @@ import {
   Sun,
   Moon,
   Menu,
-  X
+  X,
+  Volume2,
+  VolumeX,
+  Camera,
+  Loader
 } from 'lucide-react';
+
+import * as tf from '@tensorflow/tfjs';
+import * as mobilenet from '@tensorflow-models/mobilenet';
 
 import { 
   getOSRMMatrices, 
@@ -430,6 +437,14 @@ export default function App() {
     return saved !== null ? saved === 'true' : true;
   });
   
+  // AI Feature States
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechPaused, setSpeechPaused] = useState(false);
+  
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiPrediction, setAiPrediction] = useState(null);
+  const fileInputRef = useRef(null);
+  
   // Trip budget estimation states (LKR)
   const [ratePerKm, setRatePerKm] = useState(() => {
     const saved = localStorage.getItem('lankaroute_rate_per_km');
@@ -473,6 +488,226 @@ export default function App() {
   const [wikiArticle, setWikiArticle] = useState(null);
   const [wikiLanguage, setWikiLanguage] = useState('en');
   const [activeWikiImageIndex, setActiveWikiImageIndex] = useState(0);
+
+  // AI Image Recognition logic
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setActiveTab('explorer');
+    setWikiSearchQuery(wikiLanguage === 'si' ? 'AI මඟින් ඡායාරූපය පරික්ෂා කරමින්...' : 'AI Vision: Analyzing Image...');
+    setIsAiLoading(true);
+    setAiPrediction(null);
+    
+    try {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      await new Promise(resolve => img.onload = resolve);
+      
+      img.width = img.naturalWidth || 224;
+      img.height = img.naturalHeight || 224;
+      
+      const model = await mobilenet.load();
+      const predictions = await model.classify(img);
+      
+      if (predictions && predictions.length > 0) {
+        const topPrediction = predictions[0].className.toLowerCase();
+        
+        let searchKeyword = 'Landmark';
+        let siLabel = 'ස්ථානයක්';
+        
+        if (topPrediction.includes('seashore') || topPrediction.includes('coast') || topPrediction.includes('promontory')) {
+          searchKeyword = 'Beach';
+          siLabel = 'මුහුදු වෙරළක්';
+        } else if (topPrediction.includes('valley') || topPrediction.includes('alp') || topPrediction.includes('mountain') || topPrediction.includes('cliff') || topPrediction.includes('volcano')) {
+          searchKeyword = 'Mountain';
+          siLabel = 'කන්දක් හෝ කඳුකරයක්';
+        } else if (topPrediction.includes('palace') || topPrediction.includes('castle') || topPrediction.includes('megalith') || topPrediction.includes('monastery') || topPrediction.includes('ruin')) {
+          searchKeyword = 'Ruins';
+          siLabel = 'ඓතිහාසික ස්ථානයක්';
+        } else if (topPrediction.includes('stupa') || topPrediction.includes('church') || topPrediction.includes('mosque') || topPrediction.includes('dome') || topPrediction.includes('beacon') || topPrediction.includes('temple')) {
+          searchKeyword = 'Temple';
+          siLabel = 'පූජනීය ස්ථානයක්';
+        } else if (topPrediction.includes('lakeside') || topPrediction.includes('dam') || topPrediction.includes('breakwater') || topPrediction.includes('pier')) {
+          searchKeyword = 'Lake';
+          siLabel = 'ජලාශයක්';
+        } else if (topPrediction.includes('restaurant') || topPrediction.includes('dining')) {
+          searchKeyword = 'Restaurant';
+          siLabel = 'ආපන ශාලාවක්';
+        } else if (topPrediction.includes('hotel')) {
+          searchKeyword = 'Hotel';
+          siLabel = 'හෝටලයක්';
+        }
+        
+        setAiPrediction({ en: searchKeyword, si: siLabel, raw: topPrediction });
+        setWikiSearchQuery(searchKeyword);
+        setActiveTab('explorer');
+        
+        // Auto search
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchKeyword)}&lat=7.8731&lon=80.7718&limit=10`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const list = (data.features || [])
+            .filter(f => f.properties && f.properties.countrycode === 'LK')
+            .map(f => ({
+              title: f.properties.name || f.properties.street || 'Location',
+              snippet: [f.properties.district, f.properties.city, f.properties.state].filter(Boolean).join(', ').replace(/ District/g, ''),
+              source: 'photon',
+              lat: f.geometry.coordinates[1],
+              lon: f.geometry.coordinates[0],
+              osm_type: f.properties.osm_type,
+              osm_id: f.properties.osm_id
+            }));
+          setWikiSuggestions(list);
+        }
+      }
+    } catch (err) {
+      console.error('AI Image error', err);
+      alert('Error analyzing image. Please try again.');
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  // AI Voice Guide logic
+  const handleSpeechStop = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (window.aiVoiceAudio) {
+      window.aiVoiceAudio.pause();
+    }
+    window.aiVoiceChunks = [];
+    setIsSpeaking(false);
+    setSpeechPaused(false);
+  };
+
+  const handleSpeechToggle = () => {
+    if (isSpeaking) {
+      if (speechPaused) {
+        if (window.aiVoiceAudio && wikiLanguage === 'si') {
+           window.aiVoiceAudio.play();
+        } else {
+           window.speechSynthesis.resume();
+        }
+        setSpeechPaused(false);
+      } else {
+        if (window.aiVoiceAudio && wikiLanguage === 'si') {
+           window.aiVoiceAudio.pause();
+        } else {
+           window.speechSynthesis.pause();
+        }
+        setSpeechPaused(true);
+      }
+    } else {
+      const article = wikiLanguage === 'si' ? wikiArticle.si : wikiArticle.en;
+      if (!article || !article.sections || article.sections.length === 0) return;
+      
+      const validSections = article.sections.filter(s => 
+         !s.isRaw && 
+         !s.title.includes('Quick Info') && 
+         !s.title.includes('Travel Guide') &&
+         !s.title.includes('අමතර තොරතුරු') &&
+         !s.title.includes('සංචාරක මඟපෙන්වීම') &&
+         !s.title.includes('වර්තමාන තත්ත්වය') &&
+         !s.title.includes('Current Status')
+      );
+      
+      const speakText = validSections.map(s => s.content).join(". ");
+      const cleanText = speakText.replace(/#/g, '').replace(/•/g, '').replace(/\*/g, '');
+      
+      if (wikiLanguage === 'si') {
+          // Google Translate TTS fallback for Sinhala
+          const words = cleanText.split(' ');
+          const chunks = [];
+          let curr = "";
+          for (const w of words) {
+              if (curr.length + w.length + 1 > 120) { // Changed to 120 chars as requested
+                  if (curr.trim().length > 0) chunks.push(curr.trim());
+                  curr = w;
+              } else {
+                  curr += (curr.length > 0 ? " " : "") + w;
+              }
+          }
+          if (curr.trim().length > 0) chunks.push(curr.trim());
+          
+          window.aiVoiceChunks = chunks.filter(c => c.length > 0);
+          window.aiVoiceIndex = 0;
+          if (!window.aiVoiceAudio) {
+              window.aiVoiceAudio = new Audio();
+          }
+          
+          const playNext = () => {
+              if (window.aiVoiceIndex >= window.aiVoiceChunks.length) {
+                  setIsSpeaking(false);
+                  setSpeechPaused(false);
+                  return;
+              }
+              const chunk = window.aiVoiceChunks[window.aiVoiceIndex];
+              const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=si&client=tw-ob`;
+              
+              window.aiVoiceAudio.src = url;
+              window.aiVoiceAudio.load(); // Force load
+              
+              window.aiVoiceAudio.onended = () => {
+                  window.aiVoiceIndex++;
+                  playNext();
+              };
+              window.aiVoiceAudio.onerror = (e) => {
+                  console.warn("TTS Error, skipping chunk:", chunk);
+                  window.aiVoiceIndex++;
+                  setTimeout(playNext, 100); // Add small delay before next chunk to prevent rapid fire errors
+              };
+              
+              // We need a slight delay before calling play() when src changes, sometimes browsers need a tick
+              setTimeout(() => {
+                  window.aiVoiceAudio.play().catch(e => {
+                      console.warn("Audio play blocked", e);
+                      window.aiVoiceIndex++;
+                      setTimeout(playNext, 100);
+                  });
+              }, 50);
+          };
+          
+          setIsSpeaking(true);
+          setSpeechPaused(false);
+          playNext();
+      } else {
+          // Native TTS for English
+          window.speechSynthesis.cancel();
+          setTimeout(() => {
+              const utterance = new SpeechSynthesisUtterance(cleanText);
+              utterance.lang = 'en-US';
+              utterance.rate = 0.9;
+              
+              const voices = window.speechSynthesis.getVoices();
+              const enVoice = voices.find(v => v.lang === 'en-US' || v.lang.includes('en'));
+              if (enVoice) utterance.voice = enVoice;
+              
+              utterance.onend = () => {
+                setIsSpeaking(false);
+                setSpeechPaused(false);
+              };
+              utterance.onerror = (e) => {
+                console.error('Speech error', e);
+                setIsSpeaking(false);
+                setSpeechPaused(false);
+              };
+              
+              window.speechSynthesis.speak(utterance);
+              setIsSpeaking(true);
+              setSpeechPaused(false);
+          }, 50);
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      handleSpeechStop();
+    };
+  }, []);
 
   // Sync state values back to LocalStorage
   useEffect(() => {
@@ -1332,6 +1567,7 @@ out body 40;`;
     const isNominatim = typeof suggestion === 'object' && suggestion.source === 'nominatim';
     const nomCoords = isNominatim ? { lat: suggestion.lat, lon: suggestion.lon } : null;
 
+    handleSpeechStop(); // Stop any currently playing audio when a new article is loading
     setWikiLoading(true);
     setActiveWikiImageIndex(0);
     setWikiLanguage('en'); // Reset default language to English when loading a new article
@@ -2317,6 +2553,14 @@ out body 40;`;
             <>
               {/* History Explorer Search Container */}
               <div className="search-container">
+                {aiPrediction && (
+                  <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '10px', borderRadius: '8px', marginBottom: '12px', fontSize: '11px', color: '#e2e8f0' }}>
+                    <Sparkles size={12} color="#a78bfa" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                    <strong>AI Vision:</strong> {wikiLanguage === 'si' ? `මෙය ${aiPrediction.si} ලෙස හඳුනාගත්තා. ඊට අදාළ හොඳම ස්ථාන පහතින් පෙන්වා ඇත!` : `Looks like a ${aiPrediction.en}. Here are the best places in Sri Lanka for that:`}
+                    <button onClick={() => setAiPrediction(null)} style={{ float: 'right', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>✕</button>
+                  </div>
+                )}
+                
                 <div className="search-input-wrapper">
                   <Search className="search-icon" size={18} />
                   <input 
@@ -2530,11 +2774,34 @@ out body 40;`;
 
       {/* Dynamic Leaflet Map Component container */}
       <main className={`map-wrapper ${(activeTab === 'explorer' && wikiArticle) ? 'hide-map' : ''}`}>
+        
+        {/* Floating AI Vision Upload Button */}
+        <button 
+          className="map-theme-toggle-icon-only"
+          style={{ top: '90px' }}
+          onClick={() => fileInputRef.current.click()}
+          title="Upload photo for AI Recognition / පින්තූරයෙන් හඳුනාගන්න"
+        >
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={handleImageUpload}
+          />
+          {isAiLoading ? (
+            <Loader size={16} className="spin-anim" style={{ color: '#8b5cf6' }} />
+          ) : (
+            <Camera size={16} className="theme-toggle-icon" style={{ color: '#8b5cf6' }} />
+          )}
+        </button>
+
         {/* Floating Map Theme Toggle Button */}
         <button 
           className="map-theme-toggle-icon-only"
+          style={{ top: '132px' }}
           onClick={() => setMapTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-          title={mapTheme === 'dark' ? 'Switch to Google Maps Light Style / මැප් ස්ටයිල් එකට මාරু කරන්න' : 'Switch to Dark Mode / ඩාර්ක් මෝඩ් එකට මාරু කරන්න'}
+          title={mapTheme === 'dark' ? 'Switch to Google Maps Light Style / මැප් ස්ටයිල් එකට මාරු කරන්න' : 'Switch to Dark Mode / ඩාර්ක් මෝඩ් එකට මාරු කරන්න'}
         >
           {mapTheme === 'dark' ? <Sun size={18} className="theme-toggle-icon sun" /> : <Moon size={18} className="theme-toggle-icon moon" />}
         </button>
@@ -2563,7 +2830,10 @@ out body 40;`;
                   <button 
                     type="button"
                     className={`lang-btn ${wikiLanguage === 'en' ? 'active' : ''}`}
-                    onClick={() => setWikiLanguage('en')}
+                    onClick={() => {
+                      setWikiLanguage('en');
+                      handleSpeechStop();
+                    }}
                   >
                     EN
                   </button>
@@ -2573,6 +2843,7 @@ out body 40;`;
                     onClick={() => {
                       if (wikiArticle.si) {
                         setWikiLanguage('si');
+                        handleSpeechStop();
                       } else {
                         alert('මෙම ස්ථානය සඳහා සිංහල විස්තර විකිපීඩියා හි තවමත් ඇතුළත් කර නොමැත. / Sinhala details are not yet available on Wikipedia for this site.');
                       }
@@ -2587,7 +2858,30 @@ out body 40;`;
                 
                 <button 
                   className="wiki-close-btn"
-                  onClick={() => setWikiArticle(null)}
+                  onClick={handleSpeechToggle}
+                  title={wikiLanguage === 'si' ? 'කියවීම අරඹන්න / නවතන්න' : 'Play/Pause AI Voice Guide'}
+                  style={{
+                    background: isSpeaking && !speechPaused ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                    color: isSpeaking && !speechPaused ? '#10b981' : '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '8px',
+                    borderRadius: '50%',
+                    width: '36px',
+                    height: '36px',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isSpeaking && !speechPaused ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                </button>
+                <button 
+                  className="wiki-close-btn"
+                  onClick={() => {
+                    handleSpeechStop();
+                    setWikiArticle(null);
+                  }}
                   title={wikiLanguage === 'si' ? 'සිතියම වෙත' : 'Back to Map'}
                 >
                   ✕
