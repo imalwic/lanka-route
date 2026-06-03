@@ -2,8 +2,8 @@
 /* Chatbot Styles */
 .chatbot-toggle-btn {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 40px;
+  right: 40px;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -26,8 +26,8 @@
 
 .chatbot-window {
   position: fixed;
-  bottom: 90px;
-  right: 24px;
+  bottom: 110px;
+  right: 40px;
   width: 350px;
   height: 500px;
   max-height: 70vh;
