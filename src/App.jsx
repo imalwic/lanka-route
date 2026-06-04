@@ -1967,7 +1967,7 @@ out body 40;`;
 
   return (
     <div className="app-container">
-      {mobileScreen === 'home' ? (
+      {mobileScreen === 'home' && (
         <div className="mobile-home-screen">
           <div className="home-brand">
             <h1>LankaRoute</h1>
@@ -1976,28 +1976,30 @@ out body 40;`;
           
           <div className="home-dashboard-grid">
             <button className="home-dashboard-card" onClick={() => { setActiveTab('planner'); setMobileScreen('planner'); }}>
+              <div className="card-bg-overlay planner-bg"></div>
               <MapPin size={32} className="card-icon" />
               <span className="card-title">Trip Planner</span>
             </button>
             
             <button className="home-dashboard-card" onClick={() => { setActiveTab('explorer'); setMobileScreen('explorer'); }}>
+              <div className="card-bg-overlay explorer-bg"></div>
               <Compass size={32} className="card-icon" />
               <span className="card-title">History Explorer</span>
             </button>
           </div>
         </div>
-      ) : (
-        <>
-          {/* Mobile Back Button (Only visible on mobile when not home) */}
-          {mobileScreen !== null && (
-            <button 
-              className="mobile-back-btn"
-              onClick={() => setMobileScreen('home')}
-            >
-              <ChevronLeft size={24} />
-              <span>Back</span>
-            </button>
-          )}
+      )}
+
+      {/* Mobile Back Button (Only visible on mobile when not home) */}
+      {mobileScreen !== null && mobileScreen !== 'home' && (
+        <button 
+          className="mobile-back-btn"
+          onClick={() => setMobileScreen('home')}
+        >
+          <ChevronLeft size={24} />
+          <span>Back</span>
+        </button>
+      )}
 
       {/* Mobile Collapse Toggle (Only shows when sidebar is hidden) */}
       {mobileCollapsed && (
@@ -2993,8 +2995,6 @@ out body 40;`;
 
           </div>
         </main>
-      )}
-        </>
       )}
       <Chatbot />
     </div>
