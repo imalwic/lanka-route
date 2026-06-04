@@ -2731,7 +2731,7 @@ out body 40;`;
       </aside>
 
       {/* Dynamic Leaflet Map Component container */}
-      <main className={`map-wrapper ${(activeTab === 'explorer' && wikiArticle) ? 'hide-map' : ''}`}>
+      <main className={`map-wrapper ${activeTab === 'explorer' ? 'hide-map' : ''}`}>
         
         
 
