@@ -2738,7 +2738,6 @@ out body 40;`;
         {/* Floating Map Theme Toggle Button */}
         <button 
           className="map-theme-toggle-icon-only"
-          style={{ top: '132px' }}
           onClick={() => setMapTheme(prev => prev === 'dark' ? 'light' : 'dark')}
           title={mapTheme === 'dark' ? 'Switch to Google Maps Light Style / මැප් ස්ටයිල් එකට මාරු කරන්න' : 'Switch to Dark Mode / ඩාර්ක් මෝඩ් එකට මාරු කරන්න'}
         >
