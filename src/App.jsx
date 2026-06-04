@@ -2996,7 +2996,7 @@ out body 40;`;
           </div>
         </main>
       )}
-      <Chatbot />
+      {(mobileScreen === null || mobileScreen === 'home') && <Chatbot />}
     </div>
   );
 }
