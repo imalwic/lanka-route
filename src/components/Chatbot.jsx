@@ -59,14 +59,14 @@ const Chatbot = () => {
       setHasApiKey(false);
       if (messages.length === 0) {
         updateCurrentChatMessages([
-          { role: 'system', content: '⚠️ **API Key Missing**\nTo use this completely FREE AI, please add your Groq API key to the `.env.local` file:\n`VITE_GROQ_API_KEY=gsk_...`\n\nYou can get a free key from [Groq Console](https://console.groq.com/keys).' }
+          { role: 'system', content: '⚠️ **API Key Missing**\nTo use this completely FREE AI, please add your Groq API key to the `.env.local` file:\n`VITE_GROQ_API_KEY=gsk_...`\n\nYou can get a free key from [Groq Console](https://console.groq.com/keys).', timestamp: new Date().toISOString() }
         ]);
       }
     } else {
       setHasApiKey(true);
       if (messages.length === 0) {
         updateCurrentChatMessages([
-          { role: 'ai', content: 'ආයුබෝවන්! මම LankaRoute AI සංචාරක සහයකයා. ශ්‍රී ලංකාවේ සංචාරය කිරීම ගැන ඕනෑම ප්‍රශ්නයක් මගෙන් අහන්න. / Hello! I am the LankaRoute AI Travel Assistant. Ask me anything about traveling in Sri Lanka.' }
+          { role: 'ai', content: 'ආයුබෝවන්! මම LankaRoute AI සංචාරක සහයකයා. ශ්‍රී ලංකාවේ සංචාරය කිරීම ගැන ඕනෑම ප්‍රශ්නයක් මගෙන් අහන්න. / Hello! I am the LankaRoute AI Travel Assistant. Ask me anything about traveling in Sri Lanka.', timestamp: new Date().toISOString() }
         ]);
       }
     }
@@ -84,7 +84,7 @@ const Chatbot = () => {
 
     const userMsg = inputMessage.trim();
     setInputMessage('');
-    updateCurrentChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    updateCurrentChatMessages(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date().toISOString() }]);
     setIsLoading(true);
 
     try {
@@ -123,10 +123,10 @@ const Chatbot = () => {
       let text = data.choices?.[0]?.message?.content || "No response received.";
       text = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
 
-      updateCurrentChatMessages(prev => [...prev, { role: 'ai', content: text }]);
+      updateCurrentChatMessages(prev => [...prev, { role: 'ai', content: text, timestamp: new Date().toISOString() }]);
     } catch (error) {
       console.error('Groq API Error:', error);
-      updateCurrentChatMessages(prev => [...prev, { role: 'system', content: `❌ Error: Failed to get a response from the AI.\nDetails: ${error.message}` }]);
+      updateCurrentChatMessages(prev => [...prev, { role: 'system', content: `❌ Error: Failed to get a response from the AI.\nDetails: ${error.message}`, timestamp: new Date().toISOString() }]);
     } finally {
       setIsLoading(false);
     }
@@ -170,12 +170,17 @@ const Chatbot = () => {
     }
   };
 
+  const handleOpenBot = () => {
+    setIsOpen(true);
+    startNewChat();
+  };
+
   return (
     <>
       {!isOpen && (
         <button 
           className="chatbot-toggle-btn pulse-animation"
-          onClick={() => setIsOpen(true)}
+          onClick={handleOpenBot}
           title="LankaRoute AI Travel Assistant"
         >
           <Bot size={28} color="#fff" strokeWidth={1.5} />
@@ -259,6 +264,9 @@ const Chatbot = () => {
                     </div>
                     <div className="chat-message-content">
                       {msg.content}
+                      <div style={{ fontSize: '9px', color: msg.role === 'user' ? '#93c5fd' : '#64748b', textAlign: 'right', marginTop: '4px', fontStyle: 'italic' }}>
+                        {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </div>
                       {msg.role === 'ai' && (
                         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
                           <button 
