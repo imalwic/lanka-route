@@ -618,10 +618,25 @@ export default function App() {
           setSpeechPaused(false);
           playNext();
       } else {
-          // Native TTS for English
+          // Native TTS for English (with chunking to prevent long-text silent failures)
           window.speechSynthesis.cancel();
-          setTimeout(() => {
-              const utterance = new SpeechSynthesisUtterance(cleanText);
+          
+          // Split by sentences for English to prevent the 15-second utterance limit bug in browsers
+          const rawChunks = cleanText.replace(/([.!?])\s+/g, "$1|").split("|");
+          const chunks = rawChunks.map(c => c.trim()).filter(c => c.length > 0);
+          
+          window.aiVoiceChunks = chunks;
+          window.aiVoiceIndex = 0;
+          
+          const playNext = () => {
+              if (window.aiVoiceIndex >= window.aiVoiceChunks.length) {
+                  setIsSpeaking(false);
+                  setSpeechPaused(false);
+                  return;
+              }
+              
+              const chunk = window.aiVoiceChunks[window.aiVoiceIndex];
+              const utterance = new SpeechSynthesisUtterance(chunk);
               utterance.lang = 'en-US';
               utterance.rate = 0.9;
               
@@ -630,18 +645,23 @@ export default function App() {
               if (enVoice) utterance.voice = enVoice;
               
               utterance.onend = () => {
-                setIsSpeaking(false);
-                setSpeechPaused(false);
+                  window.aiVoiceIndex++;
+                  playNext();
               };
+              
               utterance.onerror = (e) => {
-                console.error('Speech error', e);
-                setIsSpeaking(false);
-                setSpeechPaused(false);
+                  console.warn('Speech error on chunk:', e);
+                  window.aiVoiceIndex++;
+                  setTimeout(playNext, 50);
               };
               
               window.speechSynthesis.speak(utterance);
+          };
+
+          setTimeout(() => {
               setIsSpeaking(true);
               setSpeechPaused(false);
+              playNext();
           }, 50);
       }
     }
