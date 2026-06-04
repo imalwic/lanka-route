@@ -25,7 +25,8 @@ import {
   Volume2,
   VolumeX,
   Camera,
-  Loader
+  Loader,
+  ChevronLeft
 } from 'lucide-react';
 
 
@@ -474,6 +475,22 @@ export default function App() {
   });
   const [mobileCollapsed, setMobileCollapsed] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
+  
+  const [mobileScreen, setMobileScreen] = useState(() => {
+    return window.innerWidth <= 768 ? 'home' : null;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) {
+        setMobileScreen(null);
+      } else if (mobileScreen === null) {
+        setMobileScreen('home');
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [mobileScreen]);
 
   // Sri Lanka Historical Place Explorer states
   const [activeTab, setActiveTab] = useState(() => {
@@ -1950,10 +1967,43 @@ out body 40;`;
 
   return (
     <div className="app-container">
+      {mobileScreen === 'home' ? (
+        <div className="mobile-home-screen">
+          <div className="home-brand">
+            <h1>LankaRoute</h1>
+            <p>Official Network of Sri Lanka Routes</p>
+          </div>
+          
+          <div className="home-dashboard-grid">
+            <button className="home-dashboard-card" onClick={() => { setActiveTab('planner'); setMobileScreen('planner'); }}>
+              <MapPin size={32} className="card-icon" />
+              <span className="card-title">Trip Planner</span>
+            </button>
+            
+            <button className="home-dashboard-card" onClick={() => { setActiveTab('explorer'); setMobileScreen('explorer'); }}>
+              <Compass size={32} className="card-icon" />
+              <span className="card-title">History Explorer</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Mobile Back Button (Only visible on mobile when not home) */}
+          {mobileScreen !== null && (
+            <button 
+              className="mobile-back-btn"
+              onClick={() => setMobileScreen('home')}
+            >
+              <ChevronLeft size={24} />
+              <span>Back</span>
+            </button>
+          )}
+
       {/* Mobile Collapse Toggle (Only shows when sidebar is hidden) */}
       {mobileCollapsed && (
         <button 
           className="mobile-toggle-btn"
+          style={{ left: mobileScreen !== null ? '100px' : '16px' }}
           onClick={() => setMobileCollapsed(false)}
         >
           <Menu size={24} />
@@ -2943,6 +2993,8 @@ out body 40;`;
 
           </div>
         </main>
+      )}
+        </>
       )}
       <Chatbot />
     </div>
