@@ -829,7 +829,10 @@ body {
     font-family: var(--font-heading);
     font-size: 32px;
     font-weight: 800;
-    color: #fff;
+    color: transparent;
+    background: linear-gradient(to right, #06b6d4, #3b82f6);
+    -webkit-background-clip: text;
+    background-clip: text;
     margin: 0;
     letter-spacing: 1px;
   }
