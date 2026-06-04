@@ -493,6 +493,23 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, [mobileScreen]);
 
+  // Handle hardware back button for mobile navigation
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (window.innerWidth <= 768) {
+        if (event.state && event.state.screen) {
+          setMobileScreen(event.state.screen);
+          setActiveTab(event.state.screen);
+        } else {
+          setMobileScreen('home');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Sri Lanka Historical Place Explorer states
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('lankaroute_active_tab') || 'planner';
@@ -1976,13 +1993,13 @@ out body 40;`;
           </div>
           
           <div className="home-dashboard-grid">
-            <button className="home-dashboard-card" onClick={() => { setActiveTab('planner'); setMobileScreen('planner'); setMobileCollapsed(false); }}>
+            <button className="home-dashboard-card" onClick={() => { setActiveTab('planner'); setMobileScreen('planner'); setMobileCollapsed(false); window.history.pushState({ screen: 'planner' }, ''); }}>
               <div className="card-bg-overlay planner-bg"></div>
               <MapPin size={32} className="card-icon" />
               <span className="card-title">Trip Planner</span>
             </button>
             
-            <button className="home-dashboard-card" onClick={() => { setActiveTab('explorer'); setMobileScreen('explorer'); setMobileCollapsed(false); }}>
+            <button className="home-dashboard-card" onClick={() => { setActiveTab('explorer'); setMobileScreen('explorer'); setMobileCollapsed(false); window.history.pushState({ screen: 'explorer' }, ''); }}>
               <div className="card-bg-overlay explorer-bg"></div>
               <Compass size={32} className="card-icon" />
               <span className="card-title">History Explorer</span>
@@ -1995,7 +2012,13 @@ out body 40;`;
       {mobileScreen !== null && mobileScreen !== 'home' && (
         <button 
           className="mobile-back-btn"
-          onClick={() => setMobileScreen('home')}
+          onClick={() => {
+            if (window.history.state && window.history.state.screen) {
+              window.history.back();
+            } else {
+              setMobileScreen('home');
+            }
+          }}
           title="Back to Home Dashboard"
         >
           <Home size={18} />
