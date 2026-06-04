@@ -1975,13 +1975,13 @@ out body 40;`;
           </div>
           
           <div className="home-dashboard-grid">
-            <button className="home-dashboard-card" onClick={() => { setActiveTab('planner'); setMobileScreen('planner'); }}>
+            <button className="home-dashboard-card" onClick={() => { setActiveTab('planner'); setMobileScreen('planner'); setMobileCollapsed(true); }}>
               <div className="card-bg-overlay planner-bg"></div>
               <MapPin size={32} className="card-icon" />
               <span className="card-title">Trip Planner</span>
             </button>
             
-            <button className="home-dashboard-card" onClick={() => { setActiveTab('explorer'); setMobileScreen('explorer'); }}>
+            <button className="home-dashboard-card" onClick={() => { setActiveTab('explorer'); setMobileScreen('explorer'); setMobileCollapsed(true); }}>
               <div className="card-bg-overlay explorer-bg"></div>
               <Compass size={32} className="card-icon" />
               <span className="card-title">History Explorer</span>
