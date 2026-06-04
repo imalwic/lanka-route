@@ -1225,6 +1225,11 @@ body {
     width: 34px;
     height: 34px;
   }
+  
+  /* Disable cross-navigation between Trip Planner and History Explorer on mobile */
+  .tab-navigation {
+    display: none !important;
+  }
 }
 
 /* Tab Navigation Switcher */
