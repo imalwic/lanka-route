@@ -2008,23 +2008,6 @@ out body 40;`;
         </div>
       )}
 
-      {/* Mobile Back Button (Only visible on mobile when not home) */}
-      {mobileScreen !== null && mobileScreen !== 'home' && (
-        <button 
-          className="mobile-back-btn"
-          onClick={() => {
-            if (window.history.state && window.history.state.screen) {
-              window.history.back();
-            } else {
-              setMobileScreen('home');
-            }
-          }}
-          title="Back to Home Dashboard"
-        >
-          <Home size={18} />
-        </button>
-      )}
-
       {/* Mobile Collapse Toggle (Only shows when sidebar is hidden) */}
       {mobileCollapsed && (
         <button 
@@ -2590,10 +2573,41 @@ out body 40;`;
             </>
           ) : (
             <>
+              {/* Mobile Back Button exclusively for History Explorer */}
+              {mobileScreen === 'explorer' && (
+                <button 
+                  onClick={() => {
+                    if (window.history.state && window.history.state.screen) {
+                      window.history.back();
+                    } else {
+                      setMobileScreen('home');
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '14px',
+                    color: '#fff',
+                    marginBottom: '16px',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  <Home size={18} style={{ color: 'var(--primary)' }} />
+                  Back to Home Dashboard
+                </button>
+              )}
+
               {/* History Explorer Search Container */}
               <div className="search-container">
-                
-                
                 <div className="search-input-wrapper">
                   <Search className="search-icon" size={18} />
                   <input 
