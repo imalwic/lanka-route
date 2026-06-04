@@ -2008,6 +2008,23 @@ out body 40;`;
         </div>
       )}
 
+      {/* Mobile Back Button (Only visible on mobile when in Trip Planner) */}
+      {mobileScreen === 'planner' && (
+        <button 
+          className="mobile-back-btn"
+          onClick={() => {
+            if (window.history.state && window.history.state.screen) {
+              window.history.back();
+            } else {
+              setMobileScreen('home');
+            }
+          }}
+          title="Back to Home Dashboard"
+        >
+          <Home size={18} />
+        </button>
+      )}
+
       {/* Mobile Collapse Toggle (Only shows when sidebar is hidden) */}
       {mobileCollapsed && (
         <button 
