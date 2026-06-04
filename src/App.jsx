@@ -26,7 +26,8 @@ import {
   VolumeX,
   Camera,
   Loader,
-  ChevronLeft
+  ChevronLeft,
+  Home
 } from 'lucide-react';
 
 
@@ -1995,9 +1996,9 @@ out body 40;`;
         <button 
           className="mobile-back-btn"
           onClick={() => setMobileScreen('home')}
+          title="Back to Home Dashboard"
         >
-          <ChevronLeft size={24} />
-          <span>Back</span>
+          <Home size={18} />
         </button>
       )}
 
@@ -2005,7 +2006,6 @@ out body 40;`;
       {mobileCollapsed && (
         <button 
           className="mobile-toggle-btn"
-          style={{ left: mobileScreen !== null ? '100px' : '16px' }}
           onClick={() => setMobileCollapsed(false)}
         >
           <Menu size={24} />

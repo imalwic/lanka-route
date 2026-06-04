@@ -903,22 +903,32 @@ body {
   }
 
   .mobile-back-btn {
-    position: fixed;
-    bottom: 24px;
-    left: 16px;
-    z-index: 3000;
+    position: absolute;
+    top: 138px;
+    right: 14px;
+    left: auto;
+    bottom: auto;
+    width: 34px;
+    height: 34px;
+    background-color: var(--bg-sidebar) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: var(--shadow-premium) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    color: var(--text-primary) !important;
     display: flex;
     align-items: center;
-    gap: 4px;
-    background: rgba(15, 23, 42, 0.9);
-    border: 1px solid var(--border-color);
-    padding: 8px 14px;
-    border-radius: 20px;
-    color: var(--text-primary);
-    font-weight: 600;
-    font-size: 14px;
-    backdrop-filter: var(--glass-blur);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    padding: 0;
+  }
+  
+  .mobile-back-btn:hover {
+    background-color: var(--primary) !important;
+    color: #000 !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 12px var(--primary-glow) !important;
   }
 
   .mobile-toggle-btn {
